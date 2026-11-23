@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-slate-800 antialiased;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Large-text mode for Qari Sahib (glasses, ~60). Toggled from the header. */
+html[data-large-text="true"] {
+  font-size: 112.5%;
+}
+html[data-large-text="true"] body {
+  @apply text-lg;
+}
+
+/* Urdu text uses Noto Nastaliq Urdu with extra line height. */
+[dir="rtl"] body,
+.font-urdu {
+  font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
+  line-height: 2.1;
+}
+
+/* Never allow horizontal overflow on small screens. */
+html,
+body {
+  overflow-x: hidden;
+}
