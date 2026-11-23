@@ -103,6 +103,9 @@ async def serialize_cycle(db: AsyncSession, cycle: RentCycle) -> dict:
         duration, grace = await get_hostel_settings(db, cycle.hostel_id)
         status = effective_status(cycle, grace)
         logger.info("Rent cycle serialized successfully.")
+        result = await db.execute(select(Resident).where(Resident.id == cycle.resident_id))
+        resident = result.scalars().first()
+        base = resident.monthly_rent if resident else cycle.total_amount
         return {
             "id": cycle.id,
             "resident_id": cycle.resident_id,
@@ -111,6 +114,8 @@ async def serialize_cycle(db: AsyncSession, cycle: RentCycle) -> dict:
             "final_deadline": final_deadline(cycle.due_date, grace).isoformat(),
             "grace_days": grace,
             "total_amount": cycle.total_amount,
+            "base_amount": base,
+            "extras_amount": max(0, cycle.total_amount - base),
             "paid_amount": cycle.paid_amount,
             "remaining": remaining_amount(cycle),
             "status": status,
@@ -141,12 +146,16 @@ async def create_first_cycle(db: AsyncSession, resident: Resident) -> RentCycle 
         if existing is not None:
             return existing
         duration, _grace = await get_hostel_settings(db, resident.hostel_id)
+        # First cycle total = base rent + ACTIVE extras at creation time.
+        from app.services.admin import extra_charge_service
+
+        total = await extra_charge_service.monthly_total(db, resident)
         cycle = RentCycle(
             resident_id=resident.id,
             hostel_id=resident.hostel_id,
             start_date=resident.start_date,
             due_date=calculate_due_date(resident.start_date, duration),
-            total_amount=resident.monthly_rent,
+            total_amount=total,
             paid_amount=0,
             status=RentCycleStatus.DUE.value,
         )
@@ -178,7 +187,11 @@ async def create_next_cycle(db: AsyncSession, cycle: RentCycle) -> RentCycle:
         result = await db.execute(select(Resident).where(Resident.id == cycle.resident_id))
         resident = result.scalars().first()
         duration, _grace = await get_hostel_settings(db, cycle.hostel_id)
-        total = resident.monthly_rent if resident else cycle.total_amount
+        # Next cycle total = base rent + ACTIVE extras NOW. A change to
+        # extras never rewrites this cycle — only the next one.
+        from app.services.admin import extra_charge_service
+
+        total = await extra_charge_service.monthly_total(db, resident) if resident else cycle.total_amount
         new_cycle = RentCycle(
             resident_id=cycle.resident_id,
             hostel_id=cycle.hostel_id,

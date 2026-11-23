@@ -4,6 +4,7 @@
 
 import { formatDate, formatRs } from "@/lib/api";
 import { Card } from "./ui";
+import { ExtrasBreakdown, type ExtraCharge } from "./ExtraCharges";
 
 export interface PersonCardData {
   id: number;
@@ -15,6 +16,9 @@ export interface PersonCardData {
   start_date: string;
   next_due_date: string;
   monthly_rent: number;
+  extras?: ExtraCharge[];
+  extras_total?: number;
+  monthly_total?: number;
   security_paid: number;
   status: string;
   building_name?: string | null;
@@ -31,7 +35,7 @@ export default function PersonCard({ person }: { person: PersonCardData }) {
     ["Phone", person.phone],
     ["Guardian phone", person.guardian_phone],
     ["Security paid", formatRs(person.security_paid)],
-    ["Monthly rent", formatRs(person.monthly_rent)],
+    ["Monthly rent (base)", formatRs(person.monthly_rent)],
     ["Due date", formatDate(person.next_due_date)],
   ];
   if (person.building_name || person.room_number) {
@@ -52,6 +56,7 @@ export default function PersonCard({ person }: { person: PersonCardData }) {
             <dd className="text-base font-semibold text-pine-800">{v}</dd>
           </div>
         ))}
+        <ExtrasBreakdown base={person.monthly_rent} extras={person.extras} />
       </dl>
     </Card>
   );

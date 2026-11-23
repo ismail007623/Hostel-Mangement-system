@@ -63,6 +63,10 @@ async def _person_card(db: AsyncSession, hostel_id: int, resident: Resident) -> 
             portion = result.scalars().first()
             portion_name = portion.name if portion else None
         logger.info("Person card fetched successfully.")
+        from app.services.admin import extra_charge_service
+
+        extras = await extra_charge_service.list_extras(db, hostel_id, resident.id)
+        extras_total = sum(e["monthly_amount"] for e in extras if e["is_active"])
         return {
             "id": resident.id,
             "full_name": user.full_name if user else "",
@@ -73,6 +77,9 @@ async def _person_card(db: AsyncSession, hostel_id: int, resident: Resident) -> 
             "start_date": resident.start_date.isoformat(),
             "next_due_date": (await _due_for(db, hostel_id, resident.start_date)).isoformat(),
             "monthly_rent": resident.monthly_rent,
+            "extras": extras,
+            "extras_total": extras_total,
+            "monthly_total": resident.monthly_rent + extras_total,
             "security_paid": resident.security_paid,
             "status": resident.status,
             "building_name": building.name if building else None,
@@ -92,11 +99,17 @@ async def _summary(db: AsyncSession, hostel_id: int, resident: Resident) -> dict
         result = await db.execute(select(User).where(User.id == resident.user_id))
         user = result.scalars().first()
         logger.info("Resident summary fetched successfully.")
+        from app.services.admin import extra_charge_service
+
+        extras_total = await extra_charge_service.active_extras_total(db, resident.id)
         return {
             "id": resident.id,
             "full_name": user.full_name if user else "",
             "phone": user.phone if user else "",
+            "cnic_number": resident.cnic_number,
             "monthly_rent": resident.monthly_rent,
+            "extras_total": extras_total,
+            "monthly_total": resident.monthly_rent + extras_total,
             "security_paid": resident.security_paid,
             "start_date": resident.start_date.isoformat(),
             "next_due_date": (await _due_for(db, hostel_id, resident.start_date)).isoformat(),
@@ -179,6 +192,11 @@ async def create_resident_manual(db: AsyncSession, hostel_id: int, payload: Resi
         seat.status = SeatStatus.OCCUPIED.value
         await db.commit()
         await db.refresh(resident)
+        from app.services.admin import extra_charge_service
+
+        # Extras BEFORE the first cycle, so its total includes them.
+        await extra_charge_service.create_extras_for_resident(db, resident.id, payload.extras)
+        await db.commit()
         await rent_service.create_first_cycle(db, resident)
         logger.info("Resident created successfully.")
         return await _summary(db, hostel_id, resident)
@@ -189,20 +207,108 @@ async def create_resident_manual(db: AsyncSession, hostel_id: int, payload: Resi
         raise Exception(f"Database error while creating resident: {e}")
 
 
-async def list_residents(db: AsyncSession, hostel_id: int) -> list[dict]:
-    """List all residents in the admin's hostel."""
+async def list_residents(
+    db: AsyncSession, hostel_id: int, page: int = 1, page_size: int = 20, search: str | None = None
+) -> dict:
+    """List residents in the admin's hostel, paginated.
+
+    ``search`` matches name, phone AND CNIC (case-insensitive,
+    partial match). Returns items + total / page / page_size / pages.
+    """
     try:
         logger.info("Fetching residents from DB")
-        result = await db.execute(select(Resident).where(Resident.hostel_id == hostel_id))
+        from sqlalchemy import func, or_
+
+        from app.services.admin import extra_charge_service  # noqa: F401  (kept for symmetry)
+
+        page = max(1, page)
+        page_size = min(100, max(1, page_size))
+        stmt = select(Resident).where(Resident.hostel_id == hostel_id)
+        count_stmt = select(func.count()).select_from(Resident).where(Resident.hostel_id == hostel_id)
+        if search:
+            term = f"%{search.strip().lower()}%"
+            # Name lives on User, phone on User, CNIC on Resident.
+            user_ids = (
+                await db.execute(
+                    select(User.id).where(
+                        or_(
+                            func.lower(User.full_name).like(term),
+                            func.lower(User.phone).like(term),
+                        )
+                    )
+                )
+            ).scalars().all()
+            stmt = stmt.where(
+                or_(
+                    Resident.user_id.in_(user_ids) if user_ids else False,
+                    func.lower(Resident.cnic_number).like(term),
+                )
+            )
+            count_stmt = select(func.count()).select_from(Resident).where(
+                Resident.hostel_id == hostel_id,
+                or_(
+                    Resident.user_id.in_(user_ids) if user_ids else False,
+                    func.lower(Resident.cnic_number).like(term),
+                ),
+            )
+        total = (await db.execute(count_stmt)).scalar() or 0
+        result = await db.execute(
+            stmt.order_by(Resident.id.asc()).offset((page - 1) * page_size).limit(page_size)
+        )
         rows = result.scalars().all()
         out = []
         for r in rows:
             out.append(await _summary(db, hostel_id, r))
+        pages = (total + page_size - 1) // page_size if total else 0
         logger.info("Residents fetched successfully.")
-        return out
+        return {"items": out, "total": total, "page": page, "page_size": page_size, "pages": pages}
     except Exception as e:
         logger.error(f"Database error while fetching residents: {e}")
         raise Exception(f"Database error while fetching residents: {e}")
+
+
+async def export_residents_csv(db: AsyncSession, hostel_id: int, search: str | None = None) -> str:
+    """Build the residents CSV export (same search filter as the list).
+
+    Columns: name, father name, phone, CNIC, room, seat, base rent,
+    extras, total, due date, status.
+    """
+    import csv
+    import io
+
+    try:
+        logger.info("Building residents CSV export")
+        page_data = await list_residents(db, hostel_id, page=1, page_size=10000, search=search)
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(
+            ["name", "father_name", "phone", "cnic", "room", "seat", "base_rent", "extras", "total", "due_date", "status"]
+        )
+        for row in page_data["items"]:
+            card = await get_resident(db, hostel_id, row["id"])
+            extras_text = "; ".join(
+                f"{e['name']} {e['monthly_amount']}" for e in card.get("extras", []) if e["is_active"]
+            )
+            writer.writerow(
+                [
+                    card["full_name"],
+                    card["father_name"],
+                    card["phone"],
+                    card["cnic_number"],
+                    card.get("room_number") or "",
+                    card.get("seat_label") or "",
+                    card["monthly_rent"],
+                    extras_text,
+                    card["monthly_total"],
+                    card["next_due_date"],
+                    card["status"],
+                ]
+            )
+        logger.info("Residents CSV export built successfully.")
+        return out.getvalue()
+    except Exception as e:
+        logger.error(f"Database error while building residents export: {e}")
+        raise Exception(f"Database error while building residents export: {e}")
 
 
 async def get_resident(db: AsyncSession, hostel_id: int, resident_id: int) -> dict:
@@ -349,7 +455,13 @@ async def list_applications(db: AsyncSession, hostel_id: int) -> list[dict]:
         raise Exception(f"Database error while fetching applications: {e}")
 
 
-async def approve_application(db: AsyncSession, hostel_id: int, application_id: int, seat_id: int) -> dict:
+async def approve_application(
+    db: AsyncSession,
+    hostel_id: int,
+    application_id: int,
+    seat_id: int,
+    extras: list | None = None,
+) -> dict:
     """Approve an application: create User + Resident, occupy the seat."""
     try:
         logger.info("Fetching application from DB")
@@ -394,6 +506,11 @@ async def approve_application(db: AsyncSession, hostel_id: int, application_id: 
         application.status = ApplicationStatus.APPROVED.value
         await db.commit()
         await db.refresh(resident)
+        from app.services.admin import extra_charge_service
+
+        # Extras BEFORE the first cycle, so its total includes them.
+        await extra_charge_service.create_extras_for_resident(db, resident.id, extras)
+        await db.commit()
         await rent_service.create_first_cycle(db, resident)
         logger.info("Application approved successfully.")
         return await _summary(db, hostel_id, resident)

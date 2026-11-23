@@ -27,6 +27,28 @@ class RoomCreate(BaseModel):
     portion_id: int | None = Field(default=None)
 
 
+class RoomCreateFlexible(BaseModel):
+    """Create a room with an OPTIONAL building.
+
+    When building_id is blank: if exactly one building exists it is
+    used; when no building exists a "Main Building" is auto-created
+    and used. (When several buildings exist, a building is required.)
+    """
+
+    room_number: str = Field(min_length=1, max_length=50)
+    room_type: RoomType
+    building_id: int | None = Field(default=None)
+    portion_id: int | None = Field(default=None)
+
+
+class RoomUpdate(BaseModel):
+    """Edit a room: number, type and/or portion. No floor field."""
+
+    room_number: str | None = Field(default=None, min_length=1, max_length=50)
+    room_type: RoomType | None = None
+    portion_id: int | None = None
+
+
 class BuildingResponse(BaseModel):
     """A building row."""
 

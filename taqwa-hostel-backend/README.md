@@ -18,6 +18,61 @@ counts, no private data) and serving uploaded screenshots under
 `/uploads` so the admin can view them when approving a payment.
 Tests: 17 pass (`uv run pytest`).
 
+## Phase 4 — UI-fixes round (built 2026-11-23)
+
+Tests: 26 pass (`uv run pytest` — 17 old + 9 new in `tests/test_phase4.py`).
+
+### Extra charges (new table `resident_extra_charges`, migration 0003)
+
+An extra charge lives on the RESIDENT, not on the room: name
+(presets AC / Cooler / Geyser + any custom name), monthly amount in
+Rs typed in by the admin (no amount is hardcoded), `is_active`,
+`start_date`, `end_date` (set when switched off), `created_at`.
+
+**RULE: monthly total = base monthly_rent + sum of ACTIVE extras.
+A change applies from the NEXT rent cycle only — it never changes
+an already-created cycle's `total_amount`.** The first cycle is
+created after the extras, so it already includes them; when a cycle
+is fully paid, the next cycle (start = previous due date) totals the
+base rent + the extras that are active at that moment. Geyser can
+therefore be switched off when winter ends and the extra rent stops
+from the next cycle.
+
+Admin endpoints (all under `/api/v1/admin/residents/{id}/extras`,
+admin auth only, Xeven envelope):
+`GET` list · `POST` add · `PUT /{charge_id}` update ·
+`POST /{charge_id}/toggle` `{"is_active": false}` ·
+`DELETE /{charge_id}` remove. Extras can also be sent with the
+manual resident add (`POST /api/v1/admin/residents`, `extras: [...]`)
+and with application approve (`POST /api/v1/admin/applications/{id}/approve`,
+`extras: [...]`). Person card, resident summary, due/paid lists and
+the resident's own room all return `extras`, `extras_total` and
+`monthly_total`; rent cycles return `base_amount` / `extras_amount`.
+
+### Pagination, search, export
+
+`GET /api/v1/admin/buildings`, `GET /api/v1/admin/buildings/{id}/rooms`,
+`GET /api/v1/admin/rooms` and `GET /api/v1/admin/residents` accept
+`?page=` (default 1) and `?page_size=` (default 20, max 100) and
+return `{items, total, page, page_size, pages}`.
+`GET /api/v1/admin/residents?search=` matches name, phone AND CNIC
+(partial, case-insensitive).
+`GET /api/v1/admin/residents/export?search=` (admin only) downloads
+CSV: name, father_name, phone, cnic, room, seat, base_rent, extras,
+total, due_date, status — same search filter as the list.
+
+### Rooms
+
+`POST /api/v1/admin/rooms` creates a room with an OPTIONAL building:
+blank + exactly one building → that building; blank + no building →
+a "Main Building" is auto-created and used; blank + several buildings
+→ 400, pick one. `PUT /api/v1/admin/rooms/{id}` edits number / type /
+portion (no floor field exists): growing adds vacant seats, shrinking
+removes only vacant seats and fails when an occupied seat would go.
+`GET /api/v1/admin/rooms/{id}` returns the room card + seats + each
+resident's extras. Room cards carry seat counts, resident names and
+each resident's monthly total.
+
 ## Requirements — uv only
 
 Install uv once (if not installed):

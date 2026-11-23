@@ -83,6 +83,10 @@ async def get_my_room(db: AsyncSession, user: User) -> dict:
             portion = result.scalars().first()
             portion_name = portion.name if portion else None
         logger.info("Resident viewed own room successfully.")
+        from app.services.admin import extra_charge_service
+
+        extras = await extra_charge_service.list_extras(db, user.hostel_id, resident.id)
+        extras_total = sum(e["monthly_amount"] for e in extras if e["is_active"])
         return {
             "full_name": user.full_name,
             "building_name": building.name if building else None,
@@ -90,6 +94,9 @@ async def get_my_room(db: AsyncSession, user: User) -> dict:
             "room_number": room.room_number if room else None,
             "seat_label": seat.seat_label if seat else None,
             "monthly_rent": resident.monthly_rent,
+            "extras": extras,
+            "extras_total": extras_total,
+            "monthly_total": resident.monthly_rent + extras_total,
             "start_date": resident.start_date.isoformat(),
             "next_due_date": next_due_date(resident.start_date, duration).isoformat(),
             "security_paid": resident.security_paid,

@@ -450,11 +450,20 @@ async def _current_cycle_row(db: AsyncSession, hostel_id: int, resident: Residen
             "phone": user.phone if user else "",
             "guardian_phone": resident.guardian_phone,
             "monthly_rent": resident.monthly_rent,
+            "extras_total": 0,
+            "monthly_total": resident.monthly_rent,
+            "extras": [],
             "cycle": await rent_service.serialize_cycle(db, cycle),
             "remaining": remaining,
             "status": "due_soon" if due_soon else status,
             "whatsapp_url": whatsapp_url(user.phone if user else "", message),
         }
+        from app.services.admin import extra_charge_service
+
+        _extras = await extra_charge_service.list_extras(db, hostel_id, resident.id)
+        row["extras"] = _extras
+        row["extras_total"] = sum(e["monthly_amount"] for e in _extras if e["is_active"])
+        row["monthly_total"] = resident.monthly_rent + row["extras_total"]
         row.update(await _room_info(db, resident))
         logger.info("Due list row built successfully.")
         return row
@@ -530,6 +539,9 @@ async def get_paid_list(db: AsyncSession, hostel_id: int) -> list[dict]:
                 "resident_id": resident.id,
                 "full_name": user.full_name if user else "",
                 "phone": user.phone if user else "",
+                "monthly_rent": resident.monthly_rent,
+                "extras_total": max(0, cycle.total_amount - resident.monthly_rent),
+                "monthly_total": cycle.total_amount,
                 "cycle": await rent_service.serialize_cycle(db, cycle),
             }
             row.update(await _room_info(db, resident))

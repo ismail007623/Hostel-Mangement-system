@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.logging_config import get_logger
 from app.core.security import JWTBearer
 from app.models.user import User
+from app.schemas.admin.extra_charge import ExtraChargeInput
 from app.schemas.public.apply import InviteCreate
 from app.services.admin import resident_service
 from pydantic import BaseModel, Field
@@ -21,6 +22,7 @@ class ApproveRequest(BaseModel):
     """Approve an application and assign a vacant seat."""
 
     seat_id: int
+    extras: list[ExtraChargeInput] = Field(default_factory=list)
 
 
 class RejectRequest(BaseModel):
@@ -72,7 +74,7 @@ async def approve_application(request: Request, application_id: int, payload: Ap
     """Approve an application and assign a seat (creates login + resident)."""
     try:
         logger.info("Entering into approve application API")
-        data = await resident_service.approve_application(db, current_user.hostel_id, application_id, payload.seat_id)
+        data = await resident_service.approve_application(db, current_user.hostel_id, application_id, payload.seat_id, payload.extras)
         logger.info("Task completed in approve application API")
         return _ok("Application approved successfully", data)
     except LookupError:

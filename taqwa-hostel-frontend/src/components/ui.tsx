@@ -91,3 +91,41 @@ export function PrimaryButton({
     </button>
   );
 }
+
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-extrabold text-pine-800">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full border border-slate-300 px-3 py-1 text-sm font-bold text-slate-600 hover:bg-slate-100"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

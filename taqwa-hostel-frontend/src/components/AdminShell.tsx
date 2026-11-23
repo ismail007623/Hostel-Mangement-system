@@ -1,5 +1,8 @@
 /* Admin area shell: only a logged-in admin may enter.
-   Role is verified with the backend (/me), not trusted from storage. */
+   Role is verified with the backend (/me), not trusted from storage.
+   The admin area has its OWN left sidebar (desktop) / top bar
+   (mobile) with ONLY admin items — no public website nav here.
+   Urdu toggle + A+ large-text toggle live in the sidebar header. */
 
 "use client";
 
@@ -8,15 +11,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, loadSession, logout } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
-import { Header } from "@/components/SiteChrome";
 import { Loading } from "@/components/ui";
 
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { t } = useLang();
+  const { t, lang, setLang, largeText, setLargeText } = useLang();
   const router = useRouter();
   const pathname = usePathname();
   const [ok, setOk] = useState(false);
   const [name, setName] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const session = loadSession();
@@ -38,7 +41,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (!ok) return <Loading label={t.loading} />;
 
-  const tabs = [
+  const items = [
     ["/admin/dashboard", t.dashboard],
     ["/admin/rooms", t.rooms],
     ["/admin/residents", t.residents],
@@ -49,31 +52,88 @@ export function AdminShell({ children }: { children: ReactNode }) {
     ["/admin/settings", t.settings],
   ] as const;
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <div className="border-b border-pine-100 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
-          <span className="mr-2 font-extrabold text-pine-800">
+  const linkCls = (href: string) =>
+    `block rounded-xl px-3 py-2.5 text-sm font-bold ${
+      pathname === href ? "bg-pine-700 text-white" : "text-pine-800 hover:bg-pine-100"
+    }`;
+
+  const nav = (
+    <>
+      <div className="flex items-center gap-2 px-1 py-1">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-700 text-xl font-extrabold text-cream">
+          T
+        </span>
+        <span className="leading-tight">
+          <span className="block text-base font-extrabold text-pine-800">Taqwa Boys Hostel</span>
+          <span className="block text-xs font-medium text-slate-500">
             {t.admin} · {name}
           </span>
-          {tabs.map(([href, label]) => (
-            <Link
-              key={href}
-              href={href}
-              className={`rounded-full px-3 py-1.5 text-sm font-bold ${
-                pathname === href ? "bg-pine-700 text-white" : "text-pine-800 hover:bg-pine-100"
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
-          <button type="button" onClick={logout} className="ml-auto text-sm font-bold text-slate-500 hover:text-red-700">
-            {t.logout}
-          </button>
-        </div>
+        </span>
       </div>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <div className="mt-2 flex gap-2 px-1">
+        <button
+          type="button"
+          onClick={() => setLargeText(!largeText)}
+          aria-pressed={largeText}
+          title={t.largeText}
+          className={`flex-1 rounded-full border px-3 py-2 text-sm font-bold ${
+            largeText ? "border-gold-500 bg-gold-500/10 text-gold-600" : "border-slate-300 text-slate-600"
+          }`}
+        >
+          A+
+        </button>
+        <button
+          type="button"
+          onClick={() => setLang(lang === "en" ? "ur" : "en")}
+          className="flex-1 rounded-full bg-pine-700 px-3 py-2 text-sm font-bold text-white"
+        >
+          {lang === "en" ? "اردو" : "English"}
+        </button>
+      </div>
+      <nav className="mt-4 grid gap-1" aria-label="Admin">
+        {items.map(([href, label]) => (
+          <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={linkCls(href)}>
+            {label}
+          </Link>
+        ))}
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-2 block rounded-xl px-3 py-2.5 text-left text-sm font-bold text-red-700 hover:bg-red-50"
+        >
+          {t.logout}
+        </button>
+      </nav>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-cream">
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-pine-100 bg-white p-4 md:block">
+        {nav}
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar with collapsible admin menu */}
+        <header className="sticky top-0 z-40 border-b border-pine-100 bg-white px-4 py-3 md:hidden">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pine-700 text-lg font-extrabold text-cream">
+              T
+            </span>
+            <span className="font-extrabold text-pine-800">Taqwa · {t.admin}</span>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
+              className="ml-auto rounded-full border border-slate-300 px-4 py-2 text-sm font-bold text-pine-800"
+            >
+              {menuOpen ? "✕ Menu" : "☰ Menu"}
+            </button>
+          </div>
+          {menuOpen ? <div className="mt-3">{nav}</div> : null}
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      </div>
     </div>
   );
 }

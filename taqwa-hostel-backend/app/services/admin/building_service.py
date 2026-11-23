@@ -29,6 +29,53 @@ def _to_dict_room(r: Room) -> dict:
     }
 
 
+def _page_params(page: int, page_size: int) -> tuple[int, int]:
+    """Clamp pagination params (page >= 1, 1 <= page_size <= 100)."""
+    return max(1, page), min(100, max(1, page_size))
+
+
+def _paginated(items: list[dict], total: int, page: int, page_size: int) -> dict:
+    """Wrap a page of items with total / pages metadata."""
+    page, page_size = _page_params(page, page_size)
+    pages = (total + page_size - 1) // page_size if total else 0
+    return {"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages}
+
+
+async def _room_card(db: AsyncSession, room: Room) -> dict:
+    """Enrich a room with seat counts and its residents (for room cards)."""
+    from app.services.admin import extra_charge_service
+
+    result = await db.execute(select(Seat).where(Seat.room_id == room.id))
+    seats = result.scalars().all()
+    vacant = sum(1 for s in seats if s.status == SeatStatus.VACANT.value)
+    occupied = sum(1 for s in seats if s.status == SeatStatus.OCCUPIED.value)
+    seat_ids = [s.id for s in seats]
+    residents: list[dict] = []
+    if seat_ids:
+        result = await db.execute(select(Resident).where(Resident.seat_id.in_(seat_ids)))
+        for r in result.scalars().all():
+            result = await db.execute(select(User).where(User.id == r.user_id))
+            user = result.scalars().first()
+            residents.append(
+                {
+                    "id": r.id,
+                    "full_name": user.full_name if user else "",
+                    "phone": user.phone if user else "",
+                    "monthly_rent": r.monthly_rent,
+                    "extras_total": await extra_charge_service.active_extras_total(db, r.id),
+                    "monthly_total": r.monthly_rent + await extra_charge_service.active_extras_total(db, r.id),
+                    "seat_id": r.seat_id,
+                }
+            )
+    return {
+        **_to_dict_room(room),
+        "total_seats": len(seats),
+        "vacant_seats": vacant,
+        "occupied_seats": occupied,
+        "residents": residents,
+    }
+
+
 async def _get_building(db: AsyncSession, hostel_id: int, building_id: int) -> Building | None:
     """Return one building of this hostel, or None."""
     try:
@@ -78,14 +125,25 @@ async def create_building(db: AsyncSession, hostel_id: int, payload: BuildingCre
         raise Exception(f"Database error while creating building: {e}")
 
 
-async def list_buildings(db: AsyncSession, hostel_id: int) -> list[dict]:
-    """List all buildings in the hostel."""
+async def list_buildings(db: AsyncSession, hostel_id: int, page: int = 1, page_size: int = 20) -> dict:
+    """List buildings in the hostel, paginated (default 20 per page)."""
     try:
         logger.info("Fetching buildings from DB")
-        result = await db.execute(select(Building).where(Building.hostel_id == hostel_id))
+        page, page_size = _page_params(page, page_size)
+        total_result = await db.execute(
+            select(func.count()).select_from(Building).where(Building.hostel_id == hostel_id)
+        )
+        total = total_result.scalar() or 0
+        result = await db.execute(
+            select(Building)
+            .where(Building.hostel_id == hostel_id)
+            .order_by(Building.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         rows = result.scalars().all()
         logger.info("Buildings fetched successfully.")
-        return [_to_dict_building(r) for r in rows]
+        return _paginated([_to_dict_building(r) for r in rows], total, page, page_size)
     except Exception as e:
         logger.error(f"Database error while fetching buildings: {e}")
         raise Exception(f"Database error while fetching buildings: {e}")
@@ -181,22 +239,183 @@ async def create_room(db: AsyncSession, hostel_id: int, building_id: int, payloa
         raise Exception(f"Database error while creating room: {e}")
 
 
-async def list_rooms(db: AsyncSession, hostel_id: int, building_id: int) -> list[dict]:
-    """List rooms of one building."""
+async def list_rooms(db: AsyncSession, hostel_id: int, building_id: int, page: int = 1, page_size: int = 20) -> dict:
+    """List rooms of one building, paginated, as enriched room cards."""
     try:
         logger.info("Fetching building from DB")
         building = await _get_building(db, hostel_id, building_id)
         if building is None:
             raise LookupError("Building not found")
-        result = await db.execute(select(Room).where(Room.building_id == building_id))
+        page, page_size = _page_params(page, page_size)
+        total_result = await db.execute(
+            select(func.count()).select_from(Room).where(Room.building_id == building_id)
+        )
+        total = total_result.scalar() or 0
+        result = await db.execute(
+            select(Room)
+            .where(Room.building_id == building_id)
+            .order_by(Room.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         rows = result.scalars().all()
         logger.info("Rooms fetched successfully.")
-        return [_to_dict_room(r) for r in rows]
+        return _paginated([await _room_card(db, r) for r in rows], total, page, page_size)
     except LookupError:
         raise
     except Exception as e:
         logger.error(f"Database error while fetching rooms: {e}")
         raise Exception(f"Database error while fetching rooms: {e}")
+
+
+async def list_all_rooms(db: AsyncSession, hostel_id: int, page: int = 1, page_size: int = 20) -> dict:
+    """List all rooms of the hostel (every building), paginated, as room cards."""
+    try:
+        logger.info("Fetching rooms from DB")
+        page, page_size = _page_params(page, page_size)
+        result = await db.execute(select(Building.id).where(Building.hostel_id == hostel_id))
+        building_ids = list(result.scalars().all())
+        if not building_ids:
+            return _paginated([], 0, page, page_size)
+        total_result = await db.execute(
+            select(func.count()).select_from(Room).where(Room.building_id.in_(building_ids))
+        )
+        total = total_result.scalar() or 0
+        result = await db.execute(
+            select(Room)
+            .where(Room.building_id.in_(building_ids))
+            .order_by(Room.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        rows = result.scalars().all()
+        logger.info("Rooms fetched successfully.")
+        return _paginated([await _room_card(db, r) for r in rows], total, page, page_size)
+    except Exception as e:
+        logger.error(f"Database error while fetching rooms: {e}")
+        raise Exception(f"Database error while fetching rooms: {e}")
+
+
+async def resolve_building_for_room(db: AsyncSession, hostel_id: int, building_id: int | None) -> Building:
+    """Resolve the building for a room create with an optional building.
+
+    Explicit id wins. Blank + exactly one building -> that building.
+    Blank + no building -> auto-create "Main Building" and use it.
+    Blank + several buildings -> ValueError (a building is required).
+    """
+    try:
+        logger.info("Resolving building for room")
+        if building_id is not None:
+            building = await _get_building(db, hostel_id, building_id)
+            if building is None:
+                raise LookupError("Building not found")
+            return building
+        result = await db.execute(select(Building).where(Building.hostel_id == hostel_id))
+        buildings = result.scalars().all()
+        if len(buildings) == 1:
+            return buildings[0]
+        if len(buildings) == 0:
+            building = Building(hostel_id=hostel_id, name="Main Building")
+            db.add(building)
+            await db.commit()
+            await db.refresh(building)
+            logger.info("Main Building auto-created successfully.")
+            return building
+        raise ValueError("Please pick a building — there is more than one")
+    except (LookupError, ValueError):
+        raise
+    except Exception as e:
+        logger.error(f"Database error while resolving building: {e}")
+        raise Exception(f"Database error while resolving building: {e}")
+
+
+async def create_room_flexible(db: AsyncSession, hostel_id: int, payload) -> dict:
+    """Create a room, resolving an optional building (see resolve rule)."""
+    building = await resolve_building_for_room(db, hostel_id, payload.building_id)
+    return await create_room(
+        db, hostel_id, building.id,
+        RoomCreate(room_number=payload.room_number, room_type=payload.room_type, portion_id=payload.portion_id),
+    )
+
+
+async def update_room(db: AsyncSession, hostel_id: int, room_id: int, payload) -> dict:
+    """Edit a room's number / type / portion.
+
+    Changing the type adjusts seats: growing adds vacant seats;
+    shrinking removes only vacant seats and fails when an occupied
+    seat would have to go (a resident lives there).
+    """
+    try:
+        logger.info("Fetching room from DB for update")
+        room = await _get_room_in_hostel(db, hostel_id, room_id)
+        if room is None:
+            raise LookupError("Room not found")
+        if payload.room_number is not None and payload.room_number != room.room_number:
+            result = await db.execute(
+                select(Room).where(
+                    Room.building_id == room.building_id, Room.room_number == payload.room_number
+                )
+            )
+            if result.scalars().first():
+                raise ValueError("Room number already exists in this building")
+            room.room_number = payload.room_number
+        if payload.portion_id is not None:
+            result = await db.execute(
+                select(Portion).where(Portion.id == payload.portion_id, Portion.building_id == room.building_id)
+            )
+            if result.scalars().first() is None:
+                raise LookupError("Portion not found")
+            room.portion_id = payload.portion_id
+        if payload.room_type is not None and payload.room_type.value != room.room_type:
+            new_count = ROOM_SEAT_COUNT.get(payload.room_type.value, 2)
+            result = await db.execute(select(Seat).where(Seat.room_id == room.id).order_by(Seat.id.asc()))
+            seats = list(result.scalars().all())
+            if new_count > len(seats):
+                for i in range(len(seats) + 1, new_count + 1):
+                    db.add(Seat(room_id=room.id, seat_label=f"Seat {i}", status=SeatStatus.VACANT.value))
+            elif new_count < len(seats):
+                extra = seats[new_count:]
+                if any(s.status == SeatStatus.OCCUPIED.value for s in extra):
+                    raise ValueError("Cannot shrink the room — a resident occupies a seat that would be removed")
+                for s in extra:
+                    await db.delete(s)
+            room.room_type = payload.room_type.value
+        await db.commit()
+        await db.refresh(room)
+        logger.info("Room updated successfully.")
+        return await _room_card(db, room)
+    except (LookupError, ValueError):
+        raise
+    except Exception as e:
+        logger.error(f"Database error while updating room: {e}")
+        raise Exception(f"Database error while updating room: {e}")
+
+
+async def get_room_detail(db: AsyncSession, hostel_id: int, room_id: int) -> dict:
+    """Return one room card plus its seats and each resident's extras."""
+    from app.services.admin import extra_charge_service
+
+    try:
+        logger.info("Fetching room from DB")
+        room = await _get_room_in_hostel(db, hostel_id, room_id)
+        if room is None:
+            raise LookupError("Room not found")
+        card = await _room_card(db, room)
+        result = await db.execute(select(Seat).where(Seat.room_id == room_id))
+        seats = result.scalars().all()
+        card["seats"] = [
+            {"id": s.id, "room_id": s.room_id, "seat_label": s.seat_label, "status": s.status}
+            for s in seats
+        ]
+        for r in card["residents"]:
+            r["extras"] = await extra_charge_service.list_extras(db, hostel_id, r["id"])
+        logger.info("Room detail fetched successfully.")
+        return card
+    except LookupError:
+        raise
+    except Exception as e:
+        logger.error(f"Database error while fetching room detail: {e}")
+        raise Exception(f"Database error while fetching room detail: {e}")
 
 
 async def _get_room_in_hostel(db: AsyncSession, hostel_id: int, room_id: int) -> Room | None:

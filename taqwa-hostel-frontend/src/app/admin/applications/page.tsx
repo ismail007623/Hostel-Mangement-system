@@ -6,7 +6,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, formatDate, formatRs } from "@/lib/api";
+import { api, ApiError, formatDate, formatRs, unwrapPage, type Page } from "@/lib/api";
+import { EXTRA_PRESETS } from "@/components/ExtraCharges";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
 import { Card, ErrorBox, Field, Loading, PrimaryButton, SectionTitle, StatusPill, inputCls } from "@/components/ui";
@@ -53,6 +54,8 @@ export default function AdminApplicationsPage() {
   const [seatId, setSeatId] = useState("");
   const [rejecting, setRejecting] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [extraOn, setExtraOn] = useState<Record<string, boolean>>({});
+  const [extraAmount, setExtraAmount] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -69,13 +72,13 @@ export default function AdminApplicationsPage() {
   }, [load]);
 
   useEffect(() => {
-    if (approving !== null) api<Building[]>("/api/v1/admin/buildings", { auth: true }).then(setBuildings).catch(() => undefined);
+    if (approving !== null) api<Page<Building>>("/api/v1/admin/buildings?page=1&page_size=100", { auth: true }).then((d) => setBuildings(unwrapPage(d))).catch(() => undefined);
   }, [approving]);
 
   useEffect(() => {
     if (!buildingId) return;
-    api<Room[]>(`/api/v1/admin/buildings/${buildingId}/rooms`, { auth: true }).then((r) => {
-      setRooms(r);
+    api<Page<Room>>(`/api/v1/admin/buildings/${buildingId}/rooms?page=1&page_size=100`, { auth: true }).then((d) => {
+      setRooms(unwrapPage(d));
       setRoomId("");
       setSeats([]);
     });
@@ -107,13 +110,19 @@ export default function AdminApplicationsPage() {
 
   async function approve(id: number) {
     if (!seatId) return;
+    const extras = EXTRA_PRESETS.filter((p) => extraOn[p] && Number(extraAmount[p]) > 0).map((p) => ({
+      name: p,
+      monthly_amount: Number(extraAmount[p]),
+    }));
     try {
       await api(`/api/v1/admin/applications/${id}/approve`, {
         method: "POST",
         auth: true,
-        body: { seat_id: Number(seatId) },
+        body: { seat_id: Number(seatId), extras },
       });
       setApproving(null);
+      setExtraOn({});
+      setExtraAmount({});
       setNotice(t.saved);
       load();
     } catch (err) {
@@ -188,7 +197,8 @@ export default function AdminApplicationsPage() {
               {a.status === "pending" ? (
                 <div className="mt-3">
                   {approving === a.id ? (
-                    <div className="grid gap-2 sm:grid-cols-4">
+                    <div className="grid gap-2">
+                      <div className="grid gap-2 sm:grid-cols-4">
                       <select className={inputCls} value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
                         <option value="">Building</option>
                         {buildings.map((b) => (
@@ -216,6 +226,17 @@ export default function AdminApplicationsPage() {
                       <PrimaryButton type="button" disabled={!seatId} onClick={() => approve(a.id)}>
                         {t.approve}
                       </PrimaryButton>
+                      </div>
+                      <p className="text-xs font-bold text-pine-800">Extra charges (optional — apply from the first cycle):</p>
+                      <div className="flex flex-wrap gap-3">
+                        {EXTRA_PRESETS.map((p) => (
+                          <label key={p} className="flex items-center gap-1 text-sm font-semibold text-pine-800">
+                            <input type="checkbox" checked={!!extraOn[p]} onChange={(e) => setExtraOn((o) => ({ ...o, [p]: e.target.checked }))} />
+                            {p}
+                            <input className={`${inputCls} w-24`} type="number" min={1} placeholder="Rs/mo" disabled={!extraOn[p]} value={extraAmount[p] ?? ""} onChange={(e) => setExtraAmount((x) => ({ ...x, [p]: e.target.value }))} />
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ) : rejecting === a.id ? (
                     <div className="flex flex-wrap gap-2">

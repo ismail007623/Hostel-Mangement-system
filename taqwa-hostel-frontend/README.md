@@ -24,18 +24,32 @@ no hotel features, no ads inside admin/resident, no OTP, no WhatsApp API.
 - `/login` — one login for everyone, phone + password, no role choice.
   The backend decides the role: admin → `/admin/dashboard`,
   resident → `/resident/home`.
-- `/admin/*` — dashboard (residents, vacant/occupied seats, paid this
-  month, due/overdue), rooms (building → rooms → seats → residents →
-  person card; create building/room), residents (list, person card,
-  manual add with vacant-seat picker), applications (invite link,
-  approve with vacant-seat assignment, reject), rent (due/paid lists,
-  paid green / due soon yellow / overdue red, wa.me reminder links),
+- `/admin/*` — admin portal behind its OWN left sidebar on desktop
+  (collapsible top menu on mobile) with ONLY admin items: Dashboard,
+  Rooms, Residents, Applications, Rent, Payments, Edit Requests,
+  Settings, Logout — no public website nav inside the admin area.
+  Urdu toggle + A+ large-text toggle are in the sidebar header.
+  Dashboard (residents, vacant/occupied seats, paid this month,
+  due/overdue), rooms (room cards grid: seat dots + counts, resident
+  names, monthly rent, View/Edit; building, room create and room edit
+  are all modal pop-outs; room create building is optional — blank
+  uses the only building or auto-creates a "Main Building"), residents
+  (search by name/phone/CNIC, pagination, Export CSV, manual add in a
+  modal with optional AC/Cooler/Geyser + custom extra charges, person
+  card with base + extras breakdown and an extras manager to
+  add/toggle/remove), applications (invite link, approve with
+  vacant-seat assignment + optional extras, reject), rent (due/paid
+  lists with base + extras breakdown, wa.me reminder links),
   payments (pending screenshots, view, approve/reject), edits (profile
   edit requests), settings (grace days; rent duration fixed at 30 days).
-- `/resident/*` — home (my room + current rent cycle), pay (rent
-  screenshot upload for approval), history (my cycles + payments),
-  profile (guardian phone changes directly; name/phone/CNIC changes
-  need admin approval).
+- `/resident/*` — resident portal with its OWN simple nav: Home, Pay,
+  History, Profile, Logout — no public nav. Home shows my room +
+  current rent cycle + my extra charges and monthly total (base +
+  active extras).
+
+**Extra-charges rule (shown in the UI): monthly total = base rent +
+sum of ACTIVE extras. A change applies from the NEXT rent cycle
+only, never to a cycle that already exists.**
 - PWA: `manifest.webmanifest`, icons, `sw.js` offline shell, installable.
   The same website is wrapped for Play Store later (see below).
 

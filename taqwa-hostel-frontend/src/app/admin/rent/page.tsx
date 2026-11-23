@@ -15,6 +15,10 @@ interface DueRow {
   full_name: string;
   phone: string;
   guardian_phone?: string;
+  monthly_rent?: number;
+  extras_total?: number;
+  monthly_total?: number;
+  extras?: { name: string; monthly_amount: number; is_active: boolean }[];
   building_name?: string | null;
   portion_name?: string | null;
   room_number?: string | null;
@@ -23,6 +27,8 @@ interface DueRow {
   cycle: {
     due_date: string;
     total_amount: number;
+    base_amount?: number;
+    extras_amount?: number;
     paid_amount: number;
     remaining: number;
     status: string;
@@ -32,9 +38,14 @@ interface PaidRow {
   resident_id: number;
   full_name: string;
   phone: string;
+  monthly_rent?: number;
+  extras_total?: number;
+  monthly_total?: number;
   cycle: {
     due_date: string;
     total_amount: number;
+    base_amount?: number;
+    extras_amount?: number;
     paid_amount: number;
     status: string;
   };
@@ -112,6 +123,13 @@ export default function AdminRentPage() {
                       {formatDate(r.cycle.due_date)} · Remaining {formatRs(r.cycle.remaining)} of{" "}
                       {formatRs(r.cycle.total_amount)}
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Base {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
+                      {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)} = {formatRs(r.cycle.total_amount)}
+                      {r.extras && r.extras.filter((e) => e.is_active).length > 0
+                        ? ` (${r.extras.filter((e) => e.is_active).map((e) => `${e.name} ${formatRs(e.monthly_amount)}`).join(", ")})`
+                        : ""}
+                    </p>
                     {r.whatsapp_url ? (
                       <a
                         href={r.whatsapp_url}
@@ -137,6 +155,10 @@ export default function AdminRentPage() {
                   <li key={`${r.resident_id}-${i}`} className="flex flex-wrap items-center gap-2 rounded-xl bg-green-50 p-3">
                     <span className="font-bold text-pine-800">{r.full_name}</span>
                     <span className="text-sm text-slate-500">{r.phone}</span>
+                    <span className="text-xs text-slate-500">
+                      Base {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
+                      {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)}
+                    </span>
                     <span className="ml-auto text-sm font-bold text-green-800">{formatRs(r.cycle.paid_amount)}</span>
                     <StatusPill status="paid" label={t.paid} />
                   </li>

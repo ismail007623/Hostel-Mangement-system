@@ -50,9 +50,9 @@ async def test_onboarding_approve_then_resident_login_and_isolation():
     token = (await _login(ADMIN_PHONE, ADMIN_PASS))["access_token"]
     headers = _auth(token)
     r = await client.get("/api/v1/admin/buildings", headers=headers)
-    building_id = r.json()["data"][0]["id"]
+    building_id = r.json()["data"]["items"][0]["id"]
     r = await client.get(f"/api/v1/admin/buildings/{building_id}/rooms", headers=headers)
-    room_id = r.json()["data"][0]["id"]
+    room_id = r.json()["data"]["items"][0]["id"]
     r = await client.get(f"/api/v1/admin/rooms/{room_id}/seats", headers=headers)
     seat_id = r.json()["data"][0]["id"]
 

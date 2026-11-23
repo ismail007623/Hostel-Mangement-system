@@ -44,6 +44,7 @@ async def init_db() -> None:
     # Imported here to avoid circular imports at module load time.
     from app.models import (  # noqa: F401
         building,
+        extra_charge,
         hostel,
         payment,
         profile_edit,

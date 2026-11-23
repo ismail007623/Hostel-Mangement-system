@@ -157,6 +157,39 @@ export function formatRs(amount: number | null | undefined): string {
   return `Rs ${Number(amount).toLocaleString("en-PK")}`;
 }
 
+/** A paginated list from the backend: {items, total, page, page_size, pages}. */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+/** Accept either a plain array (old shape) or a paginated page. */
+export function unwrapPage<T>(data: T[] | Page<T>): T[] {
+  if (Array.isArray(data)) return data;
+  return data.items ?? [];
+}
+
+/** Download a CSV (or any file) endpoint with the logged-in token. */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const session = loadSession();
+  const res = await fetch(path, {
+    headers: session ? { Authorization: `Bearer ${session.accessToken}` } : {},
+  });
+  if (!res.ok) throw new ApiError(FALLBACK_MESSAGE, res.status);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);

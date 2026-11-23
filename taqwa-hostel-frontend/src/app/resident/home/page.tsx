@@ -17,6 +17,9 @@ interface MyRoom {
   room_number: string | null;
   seat_label: string | null;
   monthly_rent: number;
+  extras?: { name: string; monthly_amount: number; is_active: boolean }[];
+  extras_total?: number;
+  monthly_total?: number;
   start_date: string;
   next_due_date: string;
   security_paid: number;
@@ -79,7 +82,13 @@ export default function ResidentHomePage() {
               </div>
               <div className="rounded-xl bg-cream px-3 py-2">
                 <dt className="text-xs font-bold uppercase text-slate-500">Monthly rent</dt>
-                <dd className="font-semibold text-pine-800">{formatRs(room?.monthly_rent)}</dd>
+                <dd className="font-semibold text-pine-800">
+                  {formatRs(room?.monthly_rent)} base
+                  {(room?.extras ?? []).filter((e) => e.is_active).length > 0
+                    ? ` + ${(room?.extras ?? []).filter((e) => e.is_active).map((e) => `${e.name} ${formatRs(e.monthly_amount)}`).join(" + ")} = ${formatRs(room?.monthly_total ?? room?.monthly_rent)}`
+                    : ""}
+                </dd>
+                <dd className="mt-1 text-xs text-slate-500">Extra charges apply from the next rent cycle.</dd>
               </div>
               <div className="rounded-xl bg-cream px-3 py-2">
                 <dt className="text-xs font-bold uppercase text-slate-500">Start date</dt>

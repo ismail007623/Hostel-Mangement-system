@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 from app.schemas.common import CNIC_PATTERN, PHONE_PATTERN
 
 
+from app.schemas.admin.extra_charge import ExtraChargeInput
+
+
 class ResidentCreate(BaseModel):
     """Manual add by the admin. Seat must be vacant; it becomes occupied."""
 
@@ -20,6 +23,7 @@ class ResidentCreate(BaseModel):
     monthly_rent: int = Field(gt=0)
     security_paid: int = Field(ge=0, default=0)
     seat_id: int
+    extras: list[ExtraChargeInput] = Field(default_factory=list)
 
 
 class ResidentResponse(BaseModel):
