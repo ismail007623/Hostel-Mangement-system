@@ -7,9 +7,9 @@
 
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, login } from "@/lib/api";
+import { ApiError, loadSession, login } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { Footer, Header } from "@/components/SiteChrome";
 import { Card, ErrorBox, Field, PrimaryButton, inputCls } from "@/components/ui";
@@ -21,6 +21,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Already logged in (header always shows Login now): bounce straight
+  // to the right portal instead of showing the form again. Runs only
+  // on the client after mount, so it cannot cause a hydration mismatch.
+  useEffect(() => {
+    const existing = loadSession();
+    if (existing) {
+      router.replace(existing.role === "admin" ? "/admin/dashboard" : "/resident/home");
+    }
+  }, [router]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();

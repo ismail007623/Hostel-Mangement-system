@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
-import { loadSession, logout, waLink } from "@/lib/api";
+import { waLink } from "@/lib/api";
 
 export const QARI_PHONE = "03004493800";
 export const HOSTEL_PHONE = "03228030864";
@@ -13,7 +13,6 @@ export const MAPS_URL =
 export function Header() {
   const { lang, setLang, t, largeText, setLargeText } = useLang();
   const pathname = usePathname();
-  const session = typeof window !== "undefined" ? loadSession() : null;
   const linkCls = (href: string) =>
     `rounded-full px-3 py-2 text-sm font-semibold ${
       pathname === href ? "bg-pine-700 text-white" : "text-pine-800 hover:bg-pine-100"
@@ -44,28 +43,13 @@ export function Header() {
           <Link href="/#about" className={linkCls("/#about")}>
             {t.about}
           </Link>
-          {session?.role === "admin" ? (
-            <Link href="/admin/dashboard" className={linkCls("/admin/dashboard")}>
-              {t.admin}
-            </Link>
-          ) : session?.role === "resident" ? (
-            <Link href="/resident/home" className={linkCls("/resident/home")}>
-              {t.resident}
-            </Link>
-          ) : (
-            <Link href="/login" className={linkCls("/login")}>
-              {t.login}
-            </Link>
-          )}
-          {session && (
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-full px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-pine-100"
-            >
-              {t.logout}
-            </button>
-          )}
+          {/* Public header always shows Login only. Admin/Resident links
+              live in their own sidebar/nav after login — reading the
+              session here rendered "Login" on the server but "Admin" on
+              the client and broke hydration. */}
+          <Link href="/login" className={linkCls("/login")}>
+            {t.login}
+          </Link>
           <button
             type="button"
             onClick={() => setLargeText(!largeText)}
