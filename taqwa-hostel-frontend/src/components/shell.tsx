@@ -6,9 +6,8 @@
  * sidebar is 248px with branding fixed at the top, an independently
  * scrolling nav, and the profile anchored at the bottom; the main
  * content scrolls on its own under a fixed global header. The header
- * shows a compact breadcrumb plus the language switcher and the
- * existing A+ large-text control (from useLang — RTL + large-text
- * behaviour is unchanged, see src/lib/i18n.tsx). The admin shell
+ * shows a compact breadcrumb plus the language switcher
+ * (RTL behaviour is unchanged, see src/lib/i18n.tsx). The admin shell
  * additionally shows a residents search box (Cmd/Ctrl+K focuses it,
  * Enter routes to /admin/residents?search=) and a pending-work bell
  * whose badge is pending payments + pending applications — STATIC
@@ -298,7 +297,7 @@ export function ShellLayout({
   /** Admin shell only: pending-work counts for the header bell. Null hides the bell (not loaded / failed). */
   pendingCounts?: PendingWorkCounts | null;
 }) {
-  const { t, lang, setLang, largeText, setLargeText } = useLang();
+  const { t, lang, setLang } = useLang();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -410,17 +409,6 @@ export function ShellLayout({
           ) : null}
           <div className="flex shrink-0 items-center gap-2">
             {pendingCounts ? <PendingWorkBell counts={pendingCounts} /> : null}
-            <button
-              type="button"
-              onClick={() => setLargeText(!largeText)}
-              aria-pressed={largeText}
-              title={t.largeText}
-              className={`inline-flex h-10 items-center rounded-btn border px-3 text-sm font-semibold ${
-                largeText ? "border-brand bg-active text-brand" : "border-line bg-white text-ink"
-              }`}
-            >
-              A+
-            </button>
             <button
               type="button"
               onClick={() => setLang(lang === "en" ? "ur" : "en")}

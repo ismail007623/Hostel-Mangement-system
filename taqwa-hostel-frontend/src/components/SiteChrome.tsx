@@ -11,7 +11,7 @@ export const MAPS_URL =
   "https://www.google.com/maps/search/?api=1&query=5+UMT+Road+Block+C2+Phase+1+Johar+Town+Lahore";
 
 export function Header() {
-  const { lang, setLang, t, largeText, setLargeText } = useLang();
+  const { lang, setLang, t } = useLang();
   const pathname = usePathname();
   const linkCls = (href: string) =>
     `rounded-lg px-3 py-2 text-sm font-semibold ${
@@ -50,17 +50,6 @@ export function Header() {
           <Link href="/login" className={linkCls("/login")}>
             {t.login}
           </Link>
-          <button
-            type="button"
-            onClick={() => setLargeText(!largeText)}
-            aria-pressed={largeText}
-            title={t.largeText}
-            className={`rounded-btn border px-3 py-2 text-sm font-semibold ${
-              largeText ? "border-brand bg-active text-brand" : "border-line text-ink"
-            }`}
-          >
-            A+
-          </button>
           <button
             type="button"
             onClick={() => setLang(lang === "en" ? "ur" : "en")}

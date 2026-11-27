@@ -1,8 +1,8 @@
 /* Admin area shell: only a logged-in admin may enter.
    Role is verified with the backend (/me), not trusted from storage.
    The admin area has its OWN sidebar with ONLY admin items — no
-   public website nav here. Urdu toggle + A+ large-text toggle live
-   in the sidebar (see src/components/shell.tsx). */
+   public website nav here. Urdu toggle lives in the header
+   (see src/components/shell.tsx). */
 
 "use client";
 

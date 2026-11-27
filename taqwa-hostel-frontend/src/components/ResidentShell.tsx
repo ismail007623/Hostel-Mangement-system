@@ -3,8 +3,8 @@
    The resident portal has its OWN sidebar with ONLY resident items
    (Home, Pay, History, Profile, Logout) — no public nav.
    A resident only ever sees their own data — every resident endpoint
-   takes the resident id from the JWT. Urdu toggle + A+ large-text
-   toggle live in the sidebar (see src/components/shell.tsx). */
+   takes the resident id from the JWT. Urdu toggle lives in the
+   header (see src/components/shell.tsx). */
 
 "use client";
 

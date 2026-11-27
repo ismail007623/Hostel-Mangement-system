@@ -43,14 +43,6 @@ h3 {
   border-radius: 4px;
 }
 
-/* Large-text mode for Qari Sahib (glasses, ~60). Toggled from the header. */
-html[data-large-text="true"] {
-  font-size: 112.5%;
-}
-html[data-large-text="true"] body {
-  @apply text-base;
-}
-
 /* Urdu text uses Noto Nastaliq Urdu with extra line height. */
 [dir="rtl"] body,
 .font-urdu {

@@ -1,4 +1,4 @@
-/* Language (English default, Urdu toggle) + large-text mode.
+/* Language (English default, Urdu toggle).
    Urdu uses Noto Nastaliq Urdu and right-to-left layout. The choice
    is stored in localStorage so it survives a reload. */
 
@@ -70,7 +70,6 @@ const STRINGS = {
     loginButton: "Log in",
     wrongLogin: "Wrong phone or password. Please try again.",
     approvalPending: "Your application is still waiting for approval. Please contact Qari Sahib.",
-    largeText: "Large text",
     admin: "Admin",
     resident: "Resident",
     dashboard: "Dashboard",
@@ -169,7 +168,6 @@ const STRINGS = {
     loginButton: "لاگ ان کریں",
     wrongLogin: "فون یا پاس ورڈ غلط ہے۔ دوبارہ کوشش کریں۔",
     approvalPending: "آپ کی درخواست ابھی منظوری کے انتظار میں ہے۔ قاری صاحب سے رابطہ کریں۔",
-    largeText: "بڑا متن",
     admin: "منتظم",
     resident: "رہائشی",
     dashboard: "ڈیش بورڈ",
@@ -215,16 +213,12 @@ interface LangCtx {
   lang: Lang;
   setLang: (lang: Lang) => void;
   t: Strings;
-  largeText: boolean;
-  setLargeText: (on: boolean) => void;
 }
 
 const Ctx = createContext<LangCtx>({
   lang: "en",
   setLang: () => undefined,
   t: STRINGS.en,
-  largeText: false,
-  setLargeText: () => undefined,
 });
 
 export function useLang(): LangCtx {
@@ -233,12 +227,10 @@ export function useLang(): LangCtx {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
-  const [largeText, setLargeTextState] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("taqwa-lang");
     if (saved === "ur" || saved === "en") setLangState(saved);
-    setLargeTextState(window.localStorage.getItem("taqwa-large-text") === "true");
   }, []);
 
   useEffect(() => {
@@ -247,19 +239,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem("taqwa-lang", lang);
   }, [lang]);
 
-  useEffect(() => {
-    document.documentElement.dataset.largeText = largeText ? "true" : "false";
-    window.localStorage.setItem("taqwa-large-text", String(largeText));
-  }, [largeText]);
-
   return (
     <Ctx.Provider
       value={{
         lang,
         setLang: setLangState,
         t: STRINGS[lang],
-        largeText,
-        setLargeText: setLargeTextState,
       }}
     >
       {children}
