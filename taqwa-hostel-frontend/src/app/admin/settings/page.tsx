@@ -27,7 +27,7 @@ interface Settings {
 }
 
 export default function AdminSettingsPage() {
-  const { t } = useLang();
+  const { t, lang, setLang } = useLang();
   const { success } = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [grace, setGrace] = useState(3);
@@ -68,6 +68,35 @@ export default function AdminSettingsPage() {
     <AdminShell>
       <SectionTitle eyebrow={t.admin} title={t.settings} sub="Rent cycle rules and the standard security amount." />
       {error ? <ErrorBox message={error} /> : null}
+      <div className="mb-4 grid max-w-2xl gap-4">
+        <Card>
+          <h2 className="text-lg font-semibold text-ink">Preferences</h2>
+          <div className="mt-4">
+            <p className="mb-2 text-sm font-semibold text-ink">Language</p>
+            <div className="inline-flex gap-1 rounded-btn bg-page p-1" role="group" aria-label="Language">
+              {(
+                [
+                  { key: "en", label: "English" },
+                  { key: "ur", label: "اردو" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  aria-pressed={lang === opt.key}
+                  onClick={() => setLang(opt.key)}
+                  className={`h-10 rounded-md px-4 text-sm font-semibold ${
+                    lang === opt.key ? "bg-white text-brand shadow-sm" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">Applies everywhere — admin, resident and the public pages.</p>
+          </div>
+        </Card>
+      </div>
       {!settings ? (
         <Loading label={t.loading} />
       ) : (

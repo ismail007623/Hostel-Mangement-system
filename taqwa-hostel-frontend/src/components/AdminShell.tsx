@@ -1,8 +1,9 @@
 /* Admin area shell: only a logged-in admin may enter.
    Role is verified with the backend (/me), not trusted from storage.
    The admin area has its OWN sidebar with ONLY admin items — no
-   public website nav here. Urdu toggle lives in the header
-   (see src/components/shell.tsx). */
+   public website nav here. The admin header is "Hostel Admin" +
+   Sign out (see src/components/shell.tsx); language is set in
+   Admin Settings → Preferences. */
 
 "use client";
 
@@ -22,8 +23,7 @@ import {
 import { api, loadSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { Loading } from "@/components/ui";
-import { ShellLayout, type PendingWorkCounts, type ShellNavGroup } from "@/components/shell";
-import { STATIC_PREVIEW } from "@/lib/staticPreview";
+import { ShellLayout, type ShellNavGroup } from "@/components/shell";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const { t } = useLang();
@@ -31,13 +31,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [ok, setOk] = useState(false);
   const [name, setName] = useState("");
-  // Pending-work bell counts are STATIC SAMPLE data for now (see
-  // src/lib/staticPreview.ts) — the backend fields do not exist yet.
-  // Badge = 2 payments + 3 applications = 5.
-  const pendingCounts: PendingWorkCounts = {
-    payments: STATIC_PREVIEW.pendingPayments,
-    applications: STATIC_PREVIEW.pendingApplications,
-  };
 
   useEffect(() => {
     const session = loadSession();
@@ -98,14 +91,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <ShellLayout
-      title={title}
-      groups={groups}
-      name={name}
-      roleLabel={t.admin}
-      showResidentSearch
-      pendingCounts={pendingCounts}
-    >
+    <ShellLayout title={title} groups={groups} name={name} roleLabel={t.admin} isAdmin>
       {children}
     </ShellLayout>
   );

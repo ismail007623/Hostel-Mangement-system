@@ -750,6 +750,41 @@ const METRIC_TONE_ICON: Record<MetricTone, string> = {
   danger: "bg-red-50 text-danger",
 };
 
+/** Compact sparkline (SVG polyline). Hidden when fewer than 2 points. */
+export function Sparkline({ values, label }: { values: number[]; label: string }) {
+  if (values.length < 2) return null;
+  const W = 76;
+  const H = 28;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = (i * (W - 4)) / (values.length - 1) + 2;
+    const y = H - 3 - ((v - min) / span) * (H - 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width={W}
+      height={H}
+      role="img"
+      aria-label={label}
+      className="shrink-0"
+    >
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke="#28805A"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx={pts[pts.length - 1].split(",")[0]} cy={pts[pts.length - 1].split(",")[1]} r="3" fill="#28805A" />
+    </svg>
+  );
+}
+
 export function MetricCard({
   icon: Icon,
   label,
@@ -760,6 +795,7 @@ export function MetricCard({
   href,
   hrefLabel,
   extra,
+  sparkline,
 }: {
   icon: LucideIcon;
   label: string;
@@ -770,6 +806,9 @@ export function MetricCard({
   href?: string;
   hrefLabel?: string;
   extra?: ReactNode;
+  /** Real historical values for the top-right sparkline. Omit when
+      no history exists — no trend is shown rather than a made-up one. */
+  sparkline?: number[];
 }) {
   const clickable = Boolean(href);
   return (
@@ -789,13 +828,11 @@ export function MetricCard({
       ) : null}
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
-              <Icon className="h-[18px] w-[18px]" aria-hidden />
-            </span>
-            <span className="text-sm font-semibold text-muted">{label}</span>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
+            <Icon className="h-[18px] w-[18px]" aria-hidden />
           </span>
-          <span className="flex shrink-0 items-center gap-0.5">
+          <span className="flex shrink-0 items-center gap-1.5">
+            {sparkline ? <Sparkline values={sparkline} label={`${label} trend`} /> : null}
             {tooltip ? (
               <span className="relative z-20">
                 <InfoTooltip text={tooltip} label={`About ${label}`} />
@@ -805,7 +842,8 @@ export function MetricCard({
           </span>
         </div>
         <p className={`mt-3 text-[28px] font-semibold leading-none tracking-tight ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
-        {sub ? <p className="mt-1.5 text-xs text-muted">{sub}</p> : null}
+        <p className="mt-1.5 text-sm font-semibold text-ink">{label}</p>
+        {sub ? <p className="mt-0.5 text-xs text-muted">{sub}</p> : null}
         {extra ? <div className="mt-3">{extra}</div> : null}
       </div>
     </Card>
