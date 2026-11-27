@@ -24,7 +24,9 @@ Inter for everything else. Icons: `lucide-react` (no emoji).
   focus return), `ConfirmDialog`, `DropdownMenu` +
   `DropdownMenuItem`, `Pagination`, `EmptyState`, `Skeleton`,
   `ToastProvider` + `useToast` (mounted in `src/app/layout.tsx`),
-  `StatusBadge` (alias `StatusPill`), `MetricCard`, `DataTable`
+  `StatusBadge` (alias `StatusPill`), `MetricCard` (label + icon on
+  top, value below, optional `tone` default/success/warning/danger),
+  `InfoTooltip` (hover + focus definition tooltip), `DataTable`
   primitives (`TableContainer`, `Table`, `TableHead`, `TableBody`,
   `TableRow`, `TableHeadCell`, `TableCell`, `DataTable`), `Toolbar`,
   `SearchInput`. Kept for existing pages: `Card`, `SectionTitle`,
@@ -36,7 +38,10 @@ Inter for everything else. Icons: `lucide-react` (no emoji).
   (Home, Pay, History, Profile). Sidebar 248px, active item =
   light-green `#E8F2EC` background + dark-green text/icon; profile
   dropdown with Logout at the bottom; drawer navigation on mobile;
-  top header shows the current page title. Role is still verified
+  sidebar is full viewport height (`100dvh`), nav scrolls
+  independently with a thin low-contrast scrollbar, branding fixed
+  at the top and profile anchored at the bottom; top header shows
+  the current page title. Role is still verified
   via `/me` in `useEffect`; the public header in `SiteChrome`
   stays static (Login only) — never read the session there.
 

@@ -53,7 +53,7 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-4 pt-5">
+      <div className="shrink-0 px-4 pt-5">
         <div className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-semibold text-white">
             T
@@ -87,7 +87,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <nav className="mt-6 flex-1 overflow-y-auto px-3 pb-4" aria-label={roleLabel}>
+      <nav className="sidebar-nav mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label={roleLabel}>
         {groups.map((group) => (
           <div key={group.label} className="mb-5">
             <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</p>
@@ -116,7 +116,7 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className="border-t border-line p-3">
+      <div className="mt-auto shrink-0 border-t border-line p-3">
         <DropdownMenu
           label={t.logout}
           trigger={
@@ -170,8 +170,8 @@ export function ShellLayout({
 
   return (
     <div className="flex min-h-screen bg-page">
-      {/* Desktop sidebar — 248px */}
-      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 border-e border-line bg-white md:block">
+      {/* Desktop sidebar — 248px, full viewport height (100dvh) */}
+      <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 border-e border-line bg-white md:block">
         <SidebarContent groups={groups} name={name} roleLabel={roleLabel} onNavigate={() => undefined} />
       </aside>
 
@@ -184,8 +184,8 @@ export function ShellLayout({
             className="absolute inset-0 bg-black/50"
             onClick={() => setDrawerOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 w-[248px] bg-white shadow-modal rtl:left-auto rtl:right-0">
-            <div className="flex justify-end p-2">
+          <aside className="absolute inset-y-0 left-0 flex h-dvh w-[248px] flex-col bg-white shadow-modal rtl:left-auto rtl:right-0">
+            <div className="flex shrink-0 justify-end p-2">
               <button
                 type="button"
                 aria-label="Close menu"
@@ -195,7 +195,7 @@ export function ShellLayout({
                 <X className="h-5 w-5" aria-hidden />
               </button>
             </div>
-            <div className="h-[calc(100%-52px)]">
+            <div className="min-h-0 flex-1">
               <SidebarContent groups={groups} name={name} roleLabel={roleLabel} onNavigate={() => setDrawerOpen(false)} />
             </div>
           </aside>
@@ -215,7 +215,7 @@ export function ShellLayout({
           </button>
           <h1 className="truncate text-lg font-semibold text-ink">{title}</h1>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>
     </div>
   );

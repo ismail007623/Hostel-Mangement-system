@@ -683,8 +683,63 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* MetricCard                                                          */
+/* InfoTooltip — keyboard-accessible definition tooltip. Shows on      */
+/* hover AND focus (not just the `title` attribute, which keyboard     */
+/* users and touch users never see).                                   */
 /* ------------------------------------------------------------------ */
+
+export function InfoTooltip({ text, label = "More info" }: { text: string; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <span className="relative inline-flex shrink-0 align-middle">
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={open ? id : undefined}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
+      >
+        <Info className="h-4 w-4" aria-hidden />
+      </button>
+      {open ? (
+        <span
+          role="tooltip"
+          id={id}
+          className="absolute right-0 top-7 z-50 w-56 rounded-lg border border-line bg-white p-2.5 text-left text-xs font-normal leading-relaxed text-ink shadow-modal rtl:left-0 rtl:right-auto"
+        >
+          {text}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* MetricCard — label + icon at the top, value below, optional sub.    */
+/* `tone` colours the value (and icon tint) for financial status:      */
+/* success = paid, warning = due, danger = overdue.                    */
+/* ------------------------------------------------------------------ */
+
+export type MetricTone = "default" | "success" | "warning" | "danger";
+
+const METRIC_TONE_VALUE: Record<MetricTone, string> = {
+  default: "text-ink",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+};
+
+const METRIC_TONE_ICON: Record<MetricTone, string> = {
+  default: "bg-active text-brand",
+  success: "bg-active text-success",
+  warning: "bg-amber-50 text-warning",
+  danger: "bg-red-50 text-danger",
+};
 
 export function MetricCard({
   icon: Icon,
@@ -692,28 +747,28 @@ export function MetricCard({
   value,
   sub,
   tooltip,
+  tone = "default",
 }: {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
   sub?: string;
   tooltip?: string;
+  tone?: MetricTone;
 }) {
   return (
-    <Card>
+    <Card className="flex h-full flex-col p-4">
       <div className="flex items-start justify-between gap-2">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-active text-brand">
-          <Icon className="h-5 w-5" aria-hidden />
-        </span>
-        {tooltip ? (
-          <span title={tooltip} aria-label={tooltip} className="text-muted">
-            <Info className="h-4 w-4" aria-hidden />
+        <span className="flex items-center gap-2">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
+            <Icon className="h-[18px] w-[18px]" aria-hidden />
           </span>
-        ) : null}
+          <span className="text-sm font-semibold text-ink">{label}</span>
+        </span>
+        {tooltip ? <InfoTooltip text={tooltip} label={`About ${label}`} /> : null}
       </div>
-      <p className="mt-3 text-2xl font-semibold leading-none text-ink">{value}</p>
-      <p className="mt-1.5 text-sm font-medium text-muted">{label}</p>
-      {sub ? <p className="mt-0.5 text-xs text-muted">{sub}</p> : null}
+      <p className={`mt-3 text-2xl font-semibold leading-none ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
+      {sub ? <p className="mt-1.5 text-xs text-muted">{sub}</p> : null}
     </Card>
   );
 }

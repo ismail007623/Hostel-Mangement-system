@@ -58,6 +58,23 @@ html[data-large-text="true"] body {
   line-height: 2.1;
 }
 
+/* Sidebar navigation scrollbar: thin and low-contrast, so it never
+   draws attention. Applied only to the sidebar nav, not globally. */
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5d1 transparent;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #cbd5d1;
+  border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Never allow horizontal overflow on small screens. */
 html,
 body {
