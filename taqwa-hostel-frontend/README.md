@@ -46,7 +46,14 @@ Inter for everything else. Icons: `lucide-react` (no emoji).
   `h-dvh overflow-hidden` — no document-level scrolling; the main
   content scrolls independently under a fixed global header, which
   shows a compact breadcrumb (role / page) plus the Urdu toggle and
-  A+ large-text control on the right. Role is still verified
+  A+ large-text control on the right. Admin-only header extras: a
+  residents search box (Cmd/Ctrl+K focuses it, Enter routes to
+  `/admin/residents?search=`, collapses to an icon on mobile) and a
+  pending-work bell (badge = pending payments + pending applications —
+  STATIC sample counts for now, 2 + 3 = 5, from
+  `src/lib/staticPreview.ts`; panel links to pending
+  payments and applications). Neither renders in the resident shell.
+  Role is still verified
   via `/me` in `useEffect`; the public header in `SiteChrome`
   stays static (Login only) — never read the session there.
 
@@ -75,13 +82,25 @@ no hotel features, no ads inside admin/resident, no OTP, no WhatsApp API.
   Rooms, Residents, Applications, Rent, Payments, Edit Requests,
   Settings, Logout — no public website nav inside the admin area.
   Urdu toggle + A+ large-text toggle are in the global header.
-  Dashboard (4 clickable KPI cards + 3 rent cards; the Occupancy
-  Rate card carries the progress bar, the standalone occupancy
-  section is gone), rooms (room cards grid: seat dots + counts, resident
+  Dashboard (time-based greeting with the admin's name from `/me` +
+  a plain "This month" label; 4 KPI cards — numbers live from the
+  dashboard API, Total Rooms "N building(s)" and Occupancy "X of Y
+  seats" live; the "N new this month" and "N rooms have space"
+  sub-lines are STATIC sample for now. A hand-rolled SVG Rent
+  Collected / New Residents area chart for the last 6 months, a Rent
+  Collection donut (Collected Rs 56,000 / Pending Rs 18,000 / Total
+  Due Rs 74,000 / Overdue Rs 9,000 sample) with legend links to
+  approved payments / due rent / overdue rent, and a Recent Activity
+  list — all three STATIC sample, labelled "Sample" on screen with a
+  preview note under the greeting. All sample data lives in one file,
+  `src/lib/staticPreview.ts`, which the later backend step replaces;
+  no trend chips anywhere),
+  rooms (room cards grid: seat dots + counts, resident
   names, monthly rent, View/Edit; building, room create and room edit
   are all modal pop-outs; room create building is optional — blank
   uses the only building or auto-creates a "Main Building"), residents
-  (search by name/phone/CNIC, pagination, Export CSV, manual add in a
+  (search by name/phone/CNIC — also honours `?search=` in the URL,
+  used by the header search and dashboard activity rows, pagination, Export CSV, manual add in a
   modal with optional AC/Cooler/Geyser + custom extra charges, person
   card with base + extras breakdown and an extras manager to
   add/toggle/remove), applications (invite link, approve with

@@ -22,7 +22,8 @@ import {
 import { api, loadSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { Loading } from "@/components/ui";
-import { ShellLayout, type ShellNavGroup } from "@/components/shell";
+import { ShellLayout, type PendingWorkCounts, type ShellNavGroup } from "@/components/shell";
+import { STATIC_PREVIEW } from "@/lib/staticPreview";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const { t } = useLang();
@@ -30,6 +31,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [ok, setOk] = useState(false);
   const [name, setName] = useState("");
+  // Pending-work bell counts are STATIC SAMPLE data for now (see
+  // src/lib/staticPreview.ts) — the backend fields do not exist yet.
+  // Badge = 2 payments + 3 applications = 5.
+  const pendingCounts: PendingWorkCounts = {
+    payments: STATIC_PREVIEW.pendingPayments,
+    applications: STATIC_PREVIEW.pendingApplications,
+  };
 
   useEffect(() => {
     const session = loadSession();
@@ -90,7 +98,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <ShellLayout title={title} groups={groups} name={name} roleLabel={t.admin}>
+    <ShellLayout
+      title={title}
+      groups={groups}
+      name={name}
+      roleLabel={t.admin}
+      showResidentSearch
+      pendingCounts={pendingCounts}
+    >
       {children}
     </ShellLayout>
   );

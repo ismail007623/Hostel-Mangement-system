@@ -776,7 +776,7 @@ export function MetricCard({
     <Card
       className={`relative flex h-full flex-col p-4 ${
         clickable
-          ? "group transition-all duration-150 hover:-translate-y-0.5 hover:border-brand/50 hover:bg-active/50 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none"
+          ? "group transition-all duration-150 hover:-translate-y-0.5 hover:border-brand/50 hover:bg-active/50 hover:shadow-[0_14px_30px_-14px_rgba(16,61,48,0.35)] motion-reduce:transform-none motion-reduce:transition-none"
           : ""
       }`}
     >
@@ -793,7 +793,7 @@ export function MetricCard({
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
               <Icon className="h-[18px] w-[18px]" aria-hidden />
             </span>
-            <span className="text-sm font-semibold text-ink">{label}</span>
+            <span className="text-sm font-semibold text-muted">{label}</span>
           </span>
           <span className="flex shrink-0 items-center gap-0.5">
             {tooltip ? (
@@ -804,7 +804,7 @@ export function MetricCard({
             {clickable ? <ArrowUpRight className="h-4 w-4 text-muted" aria-hidden /> : null}
           </span>
         </div>
-        <p className={`mt-3 text-2xl font-semibold leading-none ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
+        <p className={`mt-3 text-[28px] font-semibold leading-none tracking-tight ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
         {sub ? <p className="mt-1.5 text-xs text-muted">{sub}</p> : null}
         {extra ? <div className="mt-3">{extra}</div> : null}
       </div>

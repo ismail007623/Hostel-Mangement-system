@@ -52,7 +52,7 @@ const config: Config = {
         modal: "16px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(23, 43, 37, 0.05)",
+        card: "0 1px 2px rgba(16, 61, 48, 0.05), 0 10px 28px -14px rgba(16, 61, 48, 0.18)",
         modal: "0 8px 24px rgba(23, 43, 37, 0.12)",
       },
     },

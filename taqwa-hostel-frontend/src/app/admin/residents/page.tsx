@@ -13,7 +13,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   Download,
@@ -612,7 +613,21 @@ function AddResidentWizard({
 /* ------------------------------------------------------------------ */
 
 export default function AdminResidentsPage() {
+  return (
+    <Suspense fallback={<Loading label="Loading…" />}>
+      <AdminResidentsPageContent />
+    </Suspense>
+  );
+}
+
+/* useSearchParams needs a Suspense boundary (Next.js App Router). */
+function AdminResidentsPageContent() {
   const { t } = useLang();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // The header search and dashboard activity rows link here with
+  // ?search= — honour it on mount and whenever it changes.
+  const urlSearch = searchParams.get("search") ?? "";
   const toast = useToast();
   const [rows, setRows] = useState<ResidentRow[]>([]);
   const [pageData, setPageData] = useState<Page<ResidentRow> | null>(null);
@@ -695,8 +710,10 @@ export default function AdminResidentsPage() {
   }, []);
 
   useEffect(() => {
-    load(1, "");
-  }, [load]);
+    setSearch(urlSearch);
+    setSearchInput(urlSearch);
+    load(1, urlSearch);
+  }, [load, urlSearch]);
 
   useEffect(() => {
     buildLookup();
@@ -730,6 +747,7 @@ export default function AdminResidentsPage() {
     setBuildingFilter("");
     setRoomFilter("");
     setStatusFilter("");
+    router.replace("/admin/residents");
     load(1, "");
   }
 
@@ -789,8 +807,10 @@ export default function AdminResidentsPage() {
             className="flex w-full max-w-sm gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              setSearch(searchInput);
-              load(1, searchInput);
+              // Keep the URL in sync so the list reloads from ?search=
+              // (same path the header search and activity rows use).
+              const q = searchInput.trim();
+              router.replace(q ? `/admin/residents?search=${encodeURIComponent(q)}` : "/admin/residents");
             }}
           >
             <SearchInput
