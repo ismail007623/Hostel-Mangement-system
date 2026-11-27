@@ -26,6 +26,7 @@ import {
 } from "react";
 import {
   AlertCircle,
+  ArrowUpRight,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -36,6 +37,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 /* ------------------------------------------------------------------ */
 /* Card                                                                */
@@ -723,6 +725,13 @@ export function InfoTooltip({ text, label = "More info" }: { text: string; label
 /* MetricCard — label + icon at the top, value below, optional sub.    */
 /* `tone` colours the value (and icon tint) for financial status:      */
 /* success = paid, warning = due, danger = overdue.                    */
+/* `href` makes the card a stretched-link card: the whole card         */
+/* navigates, with a subtle arrow, hover tint, and a visible focus     */
+/* ring. The link is an empty absolute <a> that is a SIBLING of the    */
+/* InfoTooltip button — never a parent — so no interactive element     */
+/* is ever nested inside another, and the tooltip never triggers       */
+/* navigation. `extra` renders extra content below the sub (e.g. a    */
+/* progress bar).                                                       */
 /* ------------------------------------------------------------------ */
 
 export type MetricTone = "default" | "success" | "warning" | "danger";
@@ -748,6 +757,9 @@ export function MetricCard({
   sub,
   tooltip,
   tone = "default",
+  href,
+  hrefLabel,
+  extra,
 }: {
   icon: LucideIcon;
   label: string;
@@ -755,20 +767,47 @@ export function MetricCard({
   sub?: string;
   tooltip?: string;
   tone?: MetricTone;
+  href?: string;
+  hrefLabel?: string;
+  extra?: ReactNode;
 }) {
+  const clickable = Boolean(href);
   return (
-    <Card className="flex h-full flex-col p-4">
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex items-center gap-2">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
-            <Icon className="h-[18px] w-[18px]" aria-hidden />
+    <Card
+      className={`relative flex h-full flex-col p-4 ${
+        clickable
+          ? "group transition-all duration-150 hover:-translate-y-0.5 hover:border-brand/50 hover:bg-active/50 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none"
+          : ""
+      }`}
+    >
+      {href ? (
+        <Link
+          href={href}
+          aria-label={hrefLabel ?? `View ${label}`}
+          className="absolute inset-0 z-10 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        />
+      ) : null}
+      <div className="flex h-full flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${METRIC_TONE_ICON[tone]}`}>
+              <Icon className="h-[18px] w-[18px]" aria-hidden />
+            </span>
+            <span className="text-sm font-semibold text-ink">{label}</span>
           </span>
-          <span className="text-sm font-semibold text-ink">{label}</span>
-        </span>
-        {tooltip ? <InfoTooltip text={tooltip} label={`About ${label}`} /> : null}
+          <span className="flex shrink-0 items-center gap-0.5">
+            {tooltip ? (
+              <span className="relative z-20">
+                <InfoTooltip text={tooltip} label={`About ${label}`} />
+              </span>
+            ) : null}
+            {clickable ? <ArrowUpRight className="h-4 w-4 text-muted" aria-hidden /> : null}
+          </span>
+        </div>
+        <p className={`mt-3 text-2xl font-semibold leading-none ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
+        {sub ? <p className="mt-1.5 text-xs text-muted">{sub}</p> : null}
+        {extra ? <div className="mt-3">{extra}</div> : null}
       </div>
-      <p className={`mt-3 text-2xl font-semibold leading-none ${METRIC_TONE_VALUE[tone]}`}>{value}</p>
-      {sub ? <p className="mt-1.5 text-xs text-muted">{sub}</p> : null}
     </Card>
   );
 }

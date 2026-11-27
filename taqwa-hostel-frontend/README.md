@@ -25,7 +25,9 @@ Inter for everything else. Icons: `lucide-react` (no emoji).
   `DropdownMenuItem`, `Pagination`, `EmptyState`, `Skeleton`,
   `ToastProvider` + `useToast` (mounted in `src/app/layout.tsx`),
   `StatusBadge` (alias `StatusPill`), `MetricCard` (label + icon on
-  top, value below, optional `tone` default/success/warning/danger),
+  top, value below, optional `tone` default/success/warning/danger,
+  optional `href` for a stretched-link clickable card with arrow +
+  hover/focus states, optional `extra` content such as a progress bar),
   `InfoTooltip` (hover + focus definition tooltip), `DataTable`
   primitives (`TableContainer`, `Table`, `TableHead`, `TableBody`,
   `TableRow`, `TableHeadCell`, `TableCell`, `DataTable`), `Toolbar`,
@@ -40,8 +42,11 @@ Inter for everything else. Icons: `lucide-react` (no emoji).
   dropdown with Logout at the bottom; drawer navigation on mobile;
   sidebar is full viewport height (`100dvh`), nav scrolls
   independently with a thin low-contrast scrollbar, branding fixed
-  at the top and profile anchored at the bottom; top header shows
-  the current page title. Role is still verified
+  at the top and profile anchored at the bottom. The shell root is
+  `h-dvh overflow-hidden` — no document-level scrolling; the main
+  content scrolls independently under a fixed global header, which
+  shows a compact breadcrumb (role / page) plus the Urdu toggle and
+  A+ large-text control on the right. Role is still verified
   via `/me` in `useEffect`; the public header in `SiteChrome`
   stays static (Login only) — never read the session there.
 
@@ -69,9 +74,10 @@ no hotel features, no ads inside admin/resident, no OTP, no WhatsApp API.
   (drawer navigation on mobile) with ONLY admin items: Dashboard,
   Rooms, Residents, Applications, Rent, Payments, Edit Requests,
   Settings, Logout — no public website nav inside the admin area.
-  Urdu toggle + A+ large-text toggle are in the sidebar header.
-  Dashboard (residents, vacant/occupied seats, paid this month,
-  due/overdue), rooms (room cards grid: seat dots + counts, resident
+  Urdu toggle + A+ large-text toggle are in the global header.
+  Dashboard (4 clickable KPI cards + 3 rent cards; the Occupancy
+  Rate card carries the progress bar, the standalone occupancy
+  section is gone), rooms (room cards grid: seat dots + counts, resident
   names, monthly rent, View/Edit; building, room create and room edit
   are all modal pop-outs; room create building is optional — blank
   uses the only building or auto-creates a "Main Building"), residents

@@ -75,6 +75,23 @@ html[data-large-text="true"] body {
   background: transparent;
 }
 
+/* Main content scrollbar: same thin, low-contrast treatment as the
+   sidebar nav — no prominent scrollbars anywhere in the portals. */
+.main-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5d1 transparent;
+}
+.main-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.main-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5d1;
+  border-radius: 4px;
+}
+.main-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Never allow horizontal overflow on small screens. */
 html,
 body {

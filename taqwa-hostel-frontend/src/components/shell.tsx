@@ -2,11 +2,13 @@
 
 /**
  * Shared portal shell layout (admin + resident).
- * Sidebar 248px, branding at top, grouped nav, profile dropdown with
- * Logout at the bottom. Mobile: drawer navigation. The top header
- * shows the current page title plus the language switcher and the
+ * Full-height app shell (100dvh, no document-level scrolling): the
+ * sidebar is 248px with branding fixed at the top, an independently
+ * scrolling nav, and the profile anchored at the bottom; the main
+ * content scrolls on its own under a fixed global header. The header
+ * shows a compact breadcrumb plus the language switcher and the
  * existing A+ large-text control (from useLang — RTL + large-text
- * behaviour is unchanged, see src/lib/i18n.tsx).
+ * behaviour is unchanged, see src/lib/i18n.tsx). Mobile: drawer nav.
  * No session is read here during render; the calling shell verifies
  * the role via /me in useEffect before rendering this layout.
  */
@@ -41,7 +43,7 @@ function SidebarContent({
   roleLabel: string;
   onNavigate: () => void;
 }) {
-  const { t, lang, setLang, largeText, setLargeText } = useLang();
+  const { t } = useLang();
   const pathname = usePathname();
   const initials = name
     .split(" ")
@@ -60,30 +62,7 @@ function SidebarContent({
           </span>
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-[15px] font-semibold text-ink">Taqwa Boys Hostel</span>
-            <span className="block truncate text-xs text-muted">
-              {roleLabel} · {name}
-            </span>
           </span>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setLargeText(!largeText)}
-            aria-pressed={largeText}
-            title={t.largeText}
-            className={`h-10 flex-1 rounded-btn border text-sm font-semibold ${
-              largeText ? "border-brand bg-active text-brand" : "border-line bg-white text-ink"
-            }`}
-          >
-            A+
-          </button>
-          <button
-            type="button"
-            onClick={() => setLang(lang === "en" ? "ur" : "en")}
-            className="h-10 flex-1 rounded-btn bg-brand text-sm font-semibold text-white hover:bg-brand-800"
-          >
-            {lang === "en" ? "اردو" : "English"}
-          </button>
         </div>
       </div>
 
@@ -157,6 +136,7 @@ export function ShellLayout({
   roleLabel: string;
   children: ReactNode;
 }) {
+  const { t, lang, setLang, largeText, setLargeText } = useLang();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -169,9 +149,9 @@ export function ShellLayout({
   }, [drawerOpen]);
 
   return (
-    <div className="flex min-h-screen bg-page">
+    <div className="flex h-dvh overflow-hidden bg-page">
       {/* Desktop sidebar — 248px, full viewport height (100dvh) */}
-      <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 border-e border-line bg-white md:block">
+      <aside className="hidden h-dvh w-[248px] shrink-0 border-e border-line bg-white md:block">
         <SidebarContent groups={groups} name={name} roleLabel={roleLabel} onNavigate={() => undefined} />
       </aside>
 
@@ -202,20 +182,50 @@ export function ShellLayout({
         </div>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-center gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-btn text-ink hover:bg-page md:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-btn text-ink hover:bg-page md:hidden"
           >
             <Menu className="h-5 w-5" aria-hidden />
           </button>
-          <h1 className="truncate text-lg font-semibold text-ink">{title}</h1>
+          <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
+            <ol className="flex min-w-0 items-center gap-1.5 text-sm">
+              <li className="shrink-0 text-muted">{roleLabel}</li>
+              <li aria-hidden="true" className="shrink-0 text-muted">
+                /
+              </li>
+              <li className="truncate font-semibold text-ink">{title}</li>
+            </ol>
+          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLargeText(!largeText)}
+              aria-pressed={largeText}
+              title={t.largeText}
+              className={`inline-flex h-10 items-center rounded-btn border px-3 text-sm font-semibold ${
+                largeText ? "border-brand bg-active text-brand" : "border-line bg-white text-ink"
+              }`}
+            >
+              A+
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang(lang === "en" ? "ur" : "en")}
+              className="inline-flex h-10 items-center rounded-btn bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+              {lang === "en" ? "اردو" : "English"}
+            </button>
+          </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
+        <div className="main-scroll min-h-0 flex-1 overflow-y-auto">
+          <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-6">{children}</main>
+        </div>
       </div>
     </div>
   );

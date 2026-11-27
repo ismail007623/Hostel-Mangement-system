@@ -9,7 +9,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BedSingle, Building2, DoorOpen, Eye, MoreVertical, Pencil, Plus } from "lucide-react";
 import { api, ApiError, formatRs, unwrapPage, type Page } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
@@ -76,15 +77,30 @@ function occupancy(room: RoomCard): { status: string; label: string } {
   return { status: "active", label: "Partly occupied" };
 }
 
-export default function AdminRoomsPage() {
+function validAvailability(v: string | null): AvailabilityFilter {
+  return v === "vacant" || v === "full" ? v : "all";
+}
+
+function AdminRoomsPageContent() {
   const { t } = useLang();
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [activeBuilding, setActiveBuilding] = useState<Building | null>(null);
   const [rooms, setRooms] = useState<RoomCard[]>([]);
   const [roomsPage, setRoomsPage] = useState<Page<RoomCard> | null>(null);
   const [page, setPage] = useState(1);
-  const [availability, setAvailability] = useState<AvailabilityFilter>("all");
+  const [availability, setAvailability] = useState<AvailabilityFilter>(
+    validAvailability(searchParams.get("availability"))
+  );
+
+  // Keep the URL in sync so a filtered view stays shareable / refreshable.
+  function applyAvailability(v: AvailabilityFilter) {
+    setAvailability(v);
+    router.replace(v === "all" ? pathname : `${pathname}?availability=${v}`);
+  }
   const [person, setPerson] = useState<PersonCardData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -165,7 +181,7 @@ export default function AdminRoomsPage() {
     setActiveBuilding(b);
     setPerson(null);
     setViewing(null);
-    setAvailability("all");
+    applyAvailability("all");
     loadRooms(b, 1);
   }
 
@@ -330,7 +346,7 @@ export default function AdminRoomsPage() {
               aria-label="Availability"
               className="w-full sm:w-56"
               value={availability}
-              onChange={(e) => setAvailability(e.target.value as AvailabilityFilter)}
+              onChange={(e) => applyAvailability(e.target.value as AvailabilityFilter)}
               options={[
                 { value: "all", label: "All rooms" },
                 { value: "vacant", label: "Has vacant seats" },
@@ -367,7 +383,7 @@ export default function AdminRoomsPage() {
               icon={DoorOpen}
               title="No rooms match this filter"
               description="Try a different availability filter to see more rooms."
-              action={<Button variant="secondary" onClick={() => setAvailability("all")}>Show all rooms</Button>}
+              action={<Button variant="secondary" onClick={() => applyAvailability("all")}>Show all rooms</Button>}
             />
           ) : (
             <>
@@ -664,5 +680,14 @@ export default function AdminRoomsPage() {
         </Modal>
       ) : null}
     </AdminShell>
+  );
+}
+
+/* useSearchParams needs a Suspense boundary (Next.js App Router). */
+export default function AdminRoomsPage() {
+  return (
+    <Suspense fallback={<Loading label="Loading…" />}>
+      <AdminRoomsPageContent />
+    </Suspense>
   );
 }

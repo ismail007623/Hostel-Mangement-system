@@ -4,7 +4,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Eye } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
@@ -44,10 +45,50 @@ interface Payment {
 
 const FILTERS = ["pending", "approved", "rejected", "all"] as const;
 
-export default function AdminPaymentsPage() {
+type PaymentFilter = (typeof FILTERS)[number];
+
+function validPaymentFilter(v: string | null): PaymentFilter | null {
+  return v !== null && (FILTERS as readonly string[]).includes(v) ? (v as PaymentFilter) : null;
+}
+
+/* Month param is YYYY-MM. The backend has no month filter, so this is
+   applied client-side over the loaded list (see visibleRows below). */
+function validMonth(v: string | null): string | null {
+  return v !== null && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : null;
+}
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+}
+
+function AdminPaymentsPageContent() {
   const { t } = useLang();
   const { success } = useToast();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("pending");
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [filter, setFilter] = useState<PaymentFilter>(
+    validPaymentFilter(searchParams.get("status")) ?? "pending"
+  );
+  const [month, setMonth] = useState<string | null>(validMonth(searchParams.get("month")));
+
+  // Keep the URL in sync so a filtered view stays shareable / refreshable.
+  function syncUrl(nextFilter: PaymentFilter, nextMonth: string | null) {
+    const params = new URLSearchParams();
+    if (nextFilter !== "pending") params.set("status", nextFilter);
+    if (nextMonth) params.set("month", nextMonth);
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  }
+  function changeFilter(f: PaymentFilter) {
+    setFilter(f);
+    syncUrl(f, month);
+  }
+  function clearMonth() {
+    setMonth(null);
+    syncUrl(filter, null);
+  }
   const [rows, setRows] = useState<Payment[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -71,6 +112,13 @@ export default function AdminPaymentsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Client-side month filter (backend has no month param): keep only
+  // payments whose payment_date falls in the requested YYYY-MM.
+  const visibleRows = useMemo(
+    () => (month ? rows.filter((p) => (p.payment_date ?? "").startsWith(month)) : rows),
+    [rows, month]
+  );
 
   async function act(id: number, action: "approve" | "reject") {
     setBusy(true);
@@ -107,7 +155,7 @@ export default function AdminPaymentsPage() {
               key={f}
               type="button"
               aria-pressed={filter === f}
-              onClick={() => setFilter(f)}
+              onClick={() => changeFilter(f)}
               className={`inline-flex h-11 items-center rounded-btn px-4 text-sm font-semibold ${
                 filter === f
                   ? "bg-brand text-white"
@@ -119,13 +167,26 @@ export default function AdminPaymentsPage() {
           ))}
         </div>
       </Toolbar>
+      {month ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-active px-3 py-2 text-sm">
+          <span className="font-semibold text-ink">Showing payments from {monthLabel(month)}</span>
+          <span className="text-muted">(client-side filter — the backend has no month filter)</span>
+          <button
+            type="button"
+            onClick={clearMonth}
+            className="ms-auto inline-flex h-8 items-center rounded-btn border border-line bg-white px-3 text-xs font-semibold text-ink hover:bg-page"
+          >
+            Clear month
+          </button>
+        </div>
+      ) : null}
       {loading ? (
         <Loading label={t.loading} />
-      ) : rows.length === 0 ? (
+      ) : visibleRows.length === 0 ? (
         <EmptyState icon={Eye} title="No payments in this filter." />
       ) : (
         <div className="grid gap-3">
-          {rows.map((p) => (
+          {visibleRows.map((p) => (
             <Card key={p.id}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="font-semibold text-ink">{p.full_name}</span>
@@ -227,5 +288,14 @@ export default function AdminPaymentsPage() {
         loading={busy}
       />
     </AdminShell>
+  );
+}
+
+/* useSearchParams needs a Suspense boundary (Next.js App Router). */
+export default function AdminPaymentsPage() {
+  return (
+    <Suspense fallback={<Loading label="Loading…" />}>
+      <AdminPaymentsPageContent />
+    </Suspense>
   );
 }

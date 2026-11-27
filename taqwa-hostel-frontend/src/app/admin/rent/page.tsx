@@ -4,7 +4,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Wallet } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
@@ -69,9 +70,24 @@ interface PaidRow {
 
 const FILTERS = ["all", "due", "due_soon", "overdue"] as const;
 
-export default function AdminRentPage() {
+type RentFilter = (typeof FILTERS)[number];
+
+function validRentFilter(v: string | null): RentFilter | null {
+  return v !== null && (FILTERS as readonly string[]).includes(v) ? (v as RentFilter) : null;
+}
+
+function AdminRentPageContent() {
   const { t } = useLang();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [filter, setFilter] = useState<RentFilter>(validRentFilter(searchParams.get("status")) ?? "all");
+
+  // Keep the URL in sync so a filtered view stays shareable / refreshable.
+  function changeFilter(f: RentFilter) {
+    setFilter(f);
+    router.replace(f === "all" ? pathname : `${pathname}?status=${f}`);
+  }
   const [search, setSearch] = useState("");
   const [due, setDue] = useState<DueRow[]>([]);
   const [paid, setPaid] = useState<PaidRow[]>([]);
@@ -125,7 +141,7 @@ export default function AdminRentPage() {
               key={f}
               type="button"
               aria-pressed={filter === f}
-              onClick={() => setFilter(f)}
+              onClick={() => changeFilter(f)}
               className={`inline-flex h-11 items-center rounded-btn px-4 text-sm font-semibold ${
                 filter === f
                   ? "bg-brand text-white"
@@ -256,5 +272,14 @@ export default function AdminRentPage() {
         </>
       )}
     </AdminShell>
+  );
+}
+
+/* useSearchParams needs a Suspense boundary (Next.js App Router). */
+export default function AdminRentPage() {
+  return (
+    <Suspense fallback={<Loading label="Loading…" />}>
+      <AdminRentPageContent />
+    </Suspense>
   );
 }

@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   BedDouble,
-  Building2,
   CheckCircle2,
   Clock,
   DoorClosed,
+  Gauge,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import { api, ApiError, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
-import { Card, ErrorBox, InfoTooltip, MetricCard, Skeleton } from "@/components/ui";
+import { Card, ErrorBox, MetricCard, Skeleton } from "@/components/ui";
 
 interface DashboardData {
   total_residents: number;
@@ -29,15 +29,6 @@ interface DashboardData {
   overdue_count: number;
 }
 
-function SectionHeading({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="mb-2.5">
-      <h2 className="text-lg font-semibold text-ink">{title}</h2>
-      {sub ? <p className="mt-0.5 text-sm text-muted">{sub}</p> : null}
-    </div>
-  );
-}
-
 export default function AdminDashboardPage() {
   const { t } = useLang();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -49,42 +40,67 @@ export default function AdminDashboardPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : t.tryAgain));
   }, [t]);
 
-  // Occupancy is undefined when no seats exist at all — the section
-  // shows an explicit empty state instead of a misleading "0%".
+  // Occupancy is undefined when no seats exist at all — the card shows
+  // an explicit empty state instead of a misleading "0%".
   const occupancy =
     data && data.total_seats > 0
       ? Math.round((data.occupied_seats / data.total_seats) * 100)
       : null;
 
-  const overview: { icon: LucideIcon; label: string; value: number; tooltip: string; sub?: string }[] = data
+  const now = new Date();
+  const monthParam = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const operational: {
+    icon: LucideIcon;
+    label: string;
+    value: string | number;
+    sub?: string;
+    href?: string;
+    extra?: ReactNode;
+  }[] = data
     ? [
         {
           icon: Users,
           label: t.totalResidents,
           value: data.total_residents,
-          tooltip: "Residents currently living in the hostel.",
           sub: data.total_residents === 0 ? "No residents yet" : undefined,
+          href: "/admin/residents",
         },
         {
           icon: BedDouble,
           label: t.vacantSeats,
           value: data.vacant_seats,
-          tooltip: "Seats with no resident assigned.",
           sub: data.total_seats === 0 ? "No seats added yet" : undefined,
+          href: "/admin/rooms?availability=vacant",
         },
         {
           icon: DoorClosed,
           label: "Total rooms",
           value: data.total_rooms,
-          tooltip: "All rooms across all buildings.",
-          sub: data.total_rooms === 0 ? "Add a room to get started" : undefined,
+          sub: `${data.total_buildings} building${data.total_buildings === 1 ? "" : "s"}`,
+          href: "/admin/rooms",
         },
         {
-          icon: Building2,
-          label: t.buildings,
-          value: data.total_buildings,
-          tooltip: "Buildings in the hostel.",
-          sub: data.total_buildings === 0 ? "Add a building first" : undefined,
+          icon: Gauge,
+          label: "Occupancy rate",
+          value: occupancy === null ? "—" : `${occupancy}%`,
+          sub:
+            occupancy === null
+              ? "No seats added yet"
+              : `${data.occupied_seats} of ${data.total_seats} seats`,
+          extra:
+            occupancy === null ? undefined : (
+              <div
+                className="h-2 w-full overflow-hidden rounded-lg bg-line"
+                role="progressbar"
+                aria-valuenow={occupancy}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Occupancy ${occupancy} percent`}
+              >
+                <div className="h-full rounded-lg bg-brand" style={{ width: `${occupancy}%` }} />
+              </div>
+            ),
         },
       ]
     : [];
@@ -95,35 +111,42 @@ export default function AdminDashboardPage() {
     value: string | number;
     sub: string;
     tooltip: string;
-    tone: "success" | "warning" | "danger";
+    tone: "success" | "warning" | "danger" | "default";
+    href: string;
   }[] = data
     ? [
         {
           icon: CheckCircle2,
           label: t.paidThisMonth,
           value: formatRs(data.paid_amount_this_month),
-          sub: `${data.paid_this_month} payment${data.paid_this_month === 1 ? "" : "s"} approved this month`,
+          sub: `${data.paid_this_month} payment${data.paid_this_month === 1 ? "" : "s"} approved`,
           tooltip:
             "Money collected this month from approved payments. A cycle paid in two parts counts as two payments.",
           tone: "success",
+          href: `/admin/payments?status=approved&month=${monthParam}`,
         },
         {
           icon: Clock,
           label: t.dueCount,
           value: data.due_count,
-          sub: "Open cycles due now, incl. partial payments",
+          sub: "Open cycles, incl. partial payments",
           tooltip:
             "Open rent cycles that are due but not fully paid yet. Includes cycles partly paid, and cycles still inside the grace period after the due date.",
           tone: "warning",
+          href: "/admin/rent?status=due",
         },
         {
           icon: AlertTriangle,
           label: t.overdueCount,
           value: data.overdue_count,
-          sub: "Open cycles past due date + grace",
+          sub:
+            data.overdue_count > 0
+              ? "Open cycles past due date + grace"
+              : "No overdue rent — all clear",
           tooltip:
             "Open rent cycles past their due date plus the grace period. Includes cycles partly paid after the deadline.",
-          tone: "danger",
+          tone: data.overdue_count > 0 ? "danger" : "default",
+          href: "/admin/rent?status=overdue",
         },
       ]
     : [];
@@ -143,16 +166,13 @@ export default function AdminDashboardPage() {
 
       {!data && !error ? (
         <div role="status" aria-label={t.loading}>
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <Card key={i} className="p-4">
                 <Skeleton lines={3} />
               </Card>
             ))}
           </div>
-          <Card className="mb-5 p-4">
-            <Skeleton lines={3} />
-          </Card>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <Card key={i} className="p-4">
@@ -165,78 +185,24 @@ export default function AdminDashboardPage() {
 
       {data ? (
         <>
-          <section aria-label="Hostel overview" className="mb-5">
-            <SectionHeading title="Hostel overview" sub="People and places in the hostel today." />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {overview.map((m) => (
+          <section aria-label="Hostel overview" className="mb-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {operational.map((m) => (
                 <MetricCard
                   key={m.label}
                   icon={m.icon}
                   label={m.label}
                   value={m.value}
                   sub={m.sub}
-                  tooltip={m.tooltip}
+                  href={m.href}
+                  extra={m.extra}
                 />
               ))}
             </div>
           </section>
 
-          <section aria-label="Occupancy overview" className="mb-5">
-            <SectionHeading
-              title="Occupancy overview"
-              sub="Share of seats currently occupied."
-            />
-            <Card className="p-4 sm:p-5">
-              {occupancy === null ? (
-                <div className="py-2">
-                  <p className="text-base font-semibold text-ink">No seats added yet</p>
-                  <p className="mt-1 text-sm text-muted">
-                    Add a room to get started — occupancy will show here.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="flex items-center gap-1.5 text-2xl font-semibold leading-none text-ink">
-                      {occupancy}% occupied
-                      <InfoTooltip
-                        text="Occupied seats divided by total seats. A seat counts as occupied only when a resident is assigned to it."
-                        label="About occupancy"
-                      />
-                    </p>
-                    <p className="text-sm text-muted">
-                      {data.occupied_seats} of {data.total_seats} seats filled
-                    </p>
-                  </div>
-                  <div
-                    className="mt-3 h-2 w-full overflow-hidden rounded-lg bg-line"
-                    role="progressbar"
-                    aria-valuenow={occupancy}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`Occupancy ${occupancy} percent`}
-                  >
-                    <div className="h-full rounded-lg bg-brand" style={{ width: `${occupancy}%` }} />
-                  </div>
-                  <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-                    {[
-                      ["Total capacity", data.total_seats],
-                      ["Occupied seats", data.occupied_seats],
-                      ["Available seats", data.vacant_seats],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <dt className="text-xs text-muted">{label}</dt>
-                        <dd className="mt-0.5 text-base font-semibold text-ink">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              )}
-            </Card>
-          </section>
-
           <section aria-label="Rent overview">
-            <SectionHeading title="Rent overview" sub="Paid, due and overdue rent." />
+            <h2 className="mb-2.5 text-lg font-semibold text-ink">Rent overview</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {rent.map((m) => (
                 <MetricCard
@@ -247,6 +213,7 @@ export default function AdminDashboardPage() {
                   sub={m.sub}
                   tooltip={m.tooltip}
                   tone={m.tone}
+                  href={m.href}
                 />
               ))}
             </div>
