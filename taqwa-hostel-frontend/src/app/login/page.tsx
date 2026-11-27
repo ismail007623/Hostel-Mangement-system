@@ -55,8 +55,8 @@ export default function LoginPage() {
       <Header />
       <main className="mx-auto flex w-full max-w-md flex-1 items-center px-4 py-10">
         <Card className="w-full">
-          <h1 className="text-2xl font-extrabold text-pine-800">{t.loginTitle}</h1>
-          <p className="mt-1 text-sm text-slate-500">{t.loginSub}</p>
+          <h1 className="text-2xl font-semibold text-ink">{t.loginTitle}</h1>
+          <p className="mt-1 text-sm text-muted">{t.loginSub}</p>
           <form onSubmit={submit} className="mt-6 grid gap-4">
             <Field label={t.phone}>
               <input
@@ -82,7 +82,7 @@ export default function LoginPage() {
             {error ? <ErrorBox message={error} /> : null}
             <PrimaryButton disabled={busy}>{busy ? t.loading : t.loginButton}</PrimaryButton>
           </form>
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-4 text-xs text-muted">
             Admin: Qari Sahib. Residents: login starts only after Qari approves your application and gives you a seat.
           </p>
         </Card>

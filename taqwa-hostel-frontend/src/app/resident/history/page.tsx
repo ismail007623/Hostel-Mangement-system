@@ -3,10 +3,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { History } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { ResidentShell } from "@/components/ResidentShell";
-import { Card, ErrorBox, Loading, SectionTitle, StatusPill } from "@/components/ui";
+import {
+  DataTable,
+  EmptyState,
+  ErrorBox,
+  Loading,
+  SectionTitle,
+  StatusPill,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+} from "@/components/ui";
 
 interface Cycle {
   id: number;
@@ -46,54 +59,77 @@ export default function ResidentHistoryPage() {
 
   return (
     <ResidentShell>
-      <SectionTitle eyebrow={t.resident} title={t.rentHistory} />
+      <SectionTitle eyebrow={t.resident} title={t.rentHistory} sub="Your rent cycles and every payment you sent." />
       {error ? <ErrorBox message={error} /> : null}
       {loading ? (
         <Loading label={t.loading} />
       ) : (
-        <div className="grid gap-6">
-          <Card>
-            <h3 className="font-extrabold text-pine-800">Rent cycles</h3>
+        <div className="grid gap-8">
+          <section>
+            <h2 className="mb-3 text-lg font-semibold text-ink">Rent cycles</h2>
             {cycles.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No rent cycles yet.</p>
+              <EmptyState icon={History} title="No rent cycles yet." />
             ) : (
-              <ul className="mt-3 grid gap-2">
-                {cycles.map((c) => (
-                  <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-cream px-3 py-2.5">
-                    <span className="text-sm font-bold text-pine-800">
-                      {formatDate(c.start_date)} → {formatDate(c.due_date)}
-                    </span>
-                    <span className="text-sm text-slate-500">
-                      Paid {formatRs(c.paid_amount)} of {formatRs(c.total_amount)} · Remaining {formatRs(c.remaining)}
-                    </span>
-                    <span className="ml-auto">
-                      <StatusPill status={c.status} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <DataTable>
+                <TableHead>
+                  <TableRow>
+                    <TableHeadCell>Period</TableHeadCell>
+                    <TableHeadCell>Paid / total</TableHeadCell>
+                    <TableHeadCell>Remaining</TableHeadCell>
+                    <TableHeadCell>Status</TableHeadCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {cycles.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-semibold">
+                        {formatDate(c.start_date)} → {formatDate(c.due_date)}
+                      </TableCell>
+                      <TableCell>
+                        {formatRs(c.paid_amount)} of {formatRs(c.total_amount)}
+                      </TableCell>
+                      <TableCell>{formatRs(c.remaining)}</TableCell>
+                      <TableCell>
+                        <StatusPill status={c.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </DataTable>
             )}
-          </Card>
-          <Card>
-            <h3 className="font-extrabold text-pine-800">Payments</h3>
+          </section>
+          <section>
+            <h2 className="mb-3 text-lg font-semibold text-ink">Payments</h2>
             {payments.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No payments yet.</p>
+              <EmptyState icon={History} title="No payments yet." />
             ) : (
-              <ul className="mt-3 grid gap-2">
-                {payments.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-cream px-3 py-2.5">
-                    <span className="font-bold text-pine-800">{formatRs(p.amount)}</span>
-                    <span className="text-sm text-slate-500">{p.method}</span>
-                    <span className="text-sm text-slate-500">{formatDate(p.payment_date)}</span>
-                    {p.reject_reason ? <span className="text-sm text-red-700">{p.reject_reason}</span> : null}
-                    <span className="ml-auto">
-                      <StatusPill status={p.status} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <DataTable>
+                <TableHead>
+                  <TableRow>
+                    <TableHeadCell>Amount</TableHeadCell>
+                    <TableHeadCell>Method</TableHeadCell>
+                    <TableHeadCell>Date</TableHeadCell>
+                    <TableHeadCell>Status</TableHeadCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {payments.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-semibold">{formatRs(p.amount)}</TableCell>
+                      <TableCell>{p.method}</TableCell>
+                      <TableCell>{formatDate(p.payment_date)}</TableCell>
+                      <TableCell>
+                        <StatusPill status={p.status} />
+                        {p.reject_reason ? (
+                          <span className="mt-1 block text-xs font-medium text-danger">{p.reject_reason}</span>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </DataTable>
             )}
-          </Card>
+          </section>
         </div>
       )}
     </ResidentShell>

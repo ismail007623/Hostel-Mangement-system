@@ -1,8 +1,44 @@
-# Taqwa Boys Hostel — Frontend (Phase 3)
+# Taqwa Boys Hostel — Frontend (Phase 3 + redesign foundation)
 
-Next.js 14 + TypeScript + Tailwind, mobile-first. Premium direction:
-Deep Green `#0B3D2E` + Gold accent + Cream/Off-white background, Noto
-Nastaliq Urdu for Urdu, large cards, lots of space.
+Next.js 14 + TypeScript + Tailwind, mobile-first. Design direction
+(redesign foundation): enterprise-clean, Primary `#103D30`, active
+background `#E8F2EC`, page background `#F7F8FA`, card `#FFFFFF`,
+borders `#E2E8E5`, primary text `#172B25`, secondary text `#64748B`,
+success `#28805A`, warning `#B78119`, danger `#DC2626`. No gradients,
+no glassmorphism, no gold/cream theme. Noto Nastaliq Urdu for Urdu,
+Inter for everything else. Icons: `lucide-react` (no emoji).
+
+## Design tokens & shared components (foundation)
+
+- Tokens live in `tailwind.config.ts`: `brand` / `pine` (same new
+  primary scale — `pine-*` is a backwards-compatible alias, prefer
+  `brand-*`), `page`, `active`, `line`, `ink`, `muted`, `success`,
+  `warning`, `danger`; `rounded-btn` 8px, `rounded-card` 12px,
+  `rounded-modal` 16px; `shadow-card`, `shadow-modal`. Type scale:
+  page headings 28–30px semibold, section headings 18–20px semibold,
+  body 14–15px, supporting text 12–13px. Buttons 40–44px high,
+  inputs 44px, card padding 20–24px, page padding 24–32px.
+- `src/components/ui.tsx` — `Button` (primary/secondary/tertiary/
+  destructive, `loading`, `icon`), `IconButton`, `Input`, `Select`,
+  `Modal` (fixed header/footer, Escape/backdrop close, autofocus +
+  focus return), `ConfirmDialog`, `DropdownMenu` +
+  `DropdownMenuItem`, `Pagination`, `EmptyState`, `Skeleton`,
+  `ToastProvider` + `useToast` (mounted in `src/app/layout.tsx`),
+  `StatusBadge` (alias `StatusPill`), `MetricCard`, `DataTable`
+  primitives (`TableContainer`, `Table`, `TableHead`, `TableBody`,
+  `TableRow`, `TableHeadCell`, `TableCell`, `DataTable`), `Toolbar`,
+  `SearchInput`. Kept for existing pages: `Card`, `SectionTitle`,
+  `Loading`, `ErrorBox`, `Field`, `inputCls`, `PrimaryButton`.
+- `src/components/shell.tsx` — shared portal layout used by
+  `AdminShell` (groups: Overview → Dashboard; Management → Rooms &
+  Buildings, Residents, Applications; Finance → Rent, Payments;
+  Preferences → Edit Requests, Settings) and `ResidentShell`
+  (Home, Pay, History, Profile). Sidebar 248px, active item =
+  light-green `#E8F2EC` background + dark-green text/icon; profile
+  dropdown with Logout at the bottom; drawer navigation on mobile;
+  top header shows the current page title. Role is still verified
+  via `/me` in `useEffect`; the public header in `SiteChrome`
+  stays static (Login only) — never read the session there.
 
 Covers the locked POC scope only — landing page, single login, admin
 portal (Qari), resident portal — plus PWA install. No mess, no ERP,
@@ -25,7 +61,7 @@ no hotel features, no ads inside admin/resident, no OTP, no WhatsApp API.
   The backend decides the role: admin → `/admin/dashboard`,
   resident → `/resident/home`.
 - `/admin/*` — admin portal behind its OWN left sidebar on desktop
-  (collapsible top menu on mobile) with ONLY admin items: Dashboard,
+  (drawer navigation on mobile) with ONLY admin items: Dashboard,
   Rooms, Residents, Applications, Rent, Payments, Edit Requests,
   Settings, Logout — no public website nav inside the admin area.
   Urdu toggle + A+ large-text toggle are in the sidebar header.

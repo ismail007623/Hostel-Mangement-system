@@ -5,10 +5,22 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { api, ApiError, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { ResidentShell } from "@/components/ResidentShell";
-import { Card, ErrorBox, Field, Loading, PrimaryButton, SectionTitle, inputCls } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ErrorBox,
+  Field,
+  Input,
+  Loading,
+  SectionTitle,
+  Select,
+  inputCls,
+  useToast,
+} from "@/components/ui";
 
 interface Cycle {
   id: number;
@@ -23,6 +35,7 @@ const METHODS = ["JazzCash", "Easypaisa", "Bank", "Cash"];
 
 export default function ResidentPayPage() {
   const { t } = useLang();
+  const { success } = useToast();
   const [cycle, setCycle] = useState<Cycle | null>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState("");
@@ -55,6 +68,7 @@ export default function ResidentPayPage() {
       form.append("screenshot", file);
       await api("/api/v1/resident/payments", { method: "POST", auth: true, formData: form });
       setDone(true);
+      success("Payment sent for approval.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.tryAgain);
     } finally {
@@ -64,46 +78,43 @@ export default function ResidentPayPage() {
 
   return (
     <ResidentShell>
-      <SectionTitle eyebrow={t.resident} title={t.payRent} />
+      <SectionTitle eyebrow={t.resident} title={t.payRent} sub="Send a payment screenshot — Qari approves it before your rent is marked paid." />
       {loading ? (
         <Loading label={t.loading} />
       ) : !cycle ? (
         <Card>
-          <p className="text-slate-500">No open rent cycle. Please ask Qari Sahib.</p>
+          <p className="text-muted">No open rent cycle. Please ask Qari Sahib.</p>
         </Card>
       ) : done ? (
-        <Card className="border-green-200 bg-green-50">
-          <p className="font-bold text-green-800">
+        <Card className="border-line bg-active">
+          <p className="flex items-start gap-2 font-semibold text-brand">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
             Payment sent for approval. Qari Sahib will check the screenshot and approve it.
           </p>
         </Card>
       ) : (
-        <Card>
-          <p className="mb-4 text-slate-600">
-            Current cycle: remaining <strong className="text-pine-800">{formatRs(cycle.remaining)}</strong> of{" "}
+        <Card className="max-w-lg">
+          <p className="mb-4 text-sm text-muted">
+            Current cycle: remaining <strong className="text-ink">{formatRs(cycle.remaining)}</strong> of{" "}
             {formatRs(cycle.total_amount)}.
           </p>
           <form onSubmit={submit} className="grid gap-4">
-            <Field label="Amount (Rs)">
-              <input
-                className={inputCls}
-                required
-                type="number"
-                min={1}
-                max={cycle.remaining}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </Field>
-            <Field label="Payment method">
-              <select className={inputCls} value={method} onChange={(e) => setMethod(e.target.value)}>
-                {METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <Input
+              label="Amount (Rs)"
+              required
+              type="number"
+              min={1}
+              max={cycle.remaining}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              helperText={`Up to ${formatRs(cycle.remaining)} for this cycle.`}
+            />
+            <Select
+              label="Payment method"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              options={METHODS.map((m) => ({ value: m, label: m }))}
+            />
             <Field label="Rent screenshot (PNG or JPG, max 5MB)">
               <input
                 className={inputCls}
@@ -113,8 +124,11 @@ export default function ResidentPayPage() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
             </Field>
+            {file ? <p className="text-xs text-muted">Selected: {file.name}</p> : null}
             {error ? <ErrorBox message={error} /> : null}
-            <PrimaryButton disabled={busy || !file}>{busy ? t.loading : "Send for approval"}</PrimaryButton>
+            <Button type="submit" loading={busy} disabled={!file}>
+              {busy ? t.loading : "Send for approval"}
+            </Button>
           </form>
         </Card>
       )}

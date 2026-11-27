@@ -3,7 +3,7 @@
    paid, monthly rent, due date. */
 
 import { formatDate, formatRs } from "@/lib/api";
-import { Card } from "./ui";
+import { Card, StatusPill } from "./ui";
 import { ExtrasBreakdown, type ExtraCharge } from "./ExtraCharges";
 
 export interface PersonCardData {
@@ -48,12 +48,24 @@ export default function PersonCard({ person }: { person: PersonCardData }) {
   }
   return (
     <Card>
-      <h3 className="text-xl font-extrabold text-pine-800">{person.full_name}</h3>
-      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-semibold text-ink">{person.full_name}</h3>
+          {person.building_name || person.room_number ? (
+            <p className="mt-1 text-sm text-muted">
+              {[person.building_name, person.room_number ? `Room ${person.room_number}` : "", person.seat_label]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
+        </div>
+        <StatusPill status={person.status} />
+      </div>
+      <dl className="mt-4 grid gap-2 sm:grid-cols-2">
         {rows.map(([k, v]) => (
-          <div key={k} className="rounded-xl bg-cream px-3 py-2">
-            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{k}</dt>
-            <dd className="text-base font-semibold text-pine-800">{v}</dd>
+          <div key={k} className="rounded-lg bg-active px-3 py-2">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{k}</dt>
+            <dd className="text-base font-semibold text-ink">{v}</dd>
           </div>
         ))}
         <ExtrasBreakdown base={person.monthly_rent} extras={person.extras} />

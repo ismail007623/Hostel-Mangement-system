@@ -2,13 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens (see tailwind.config.ts): primary #103D30, active bg
+   #E8F2EC, page bg #F7F8FA, card #FFFFFF, borders #E2E8E5,
+   primary text #172B25, secondary text #64748B, success #28805A,
+   warning #B78119, danger #DC2626. No gradients, no glassmorphism. */
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  @apply bg-cream text-slate-800 antialiased;
+  @apply bg-page text-ink antialiased;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* Type scale: page headings 28-30px semibold, section headings
+   18-20px semibold, body 14-15px, supporting text 12-13px. */
+h1 {
+  font-size: 29px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+h2 {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Visible focus ring on every interactive element. */
+:focus-visible {
+  outline: 2px solid #103d30;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Large-text mode for Qari Sahib (glasses, ~60). Toggled from the header. */
@@ -16,7 +48,7 @@ html[data-large-text="true"] {
   font-size: 112.5%;
 }
 html[data-large-text="true"] body {
-  @apply text-lg;
+  @apply text-base;
 }
 
 /* Urdu text uses Noto Nastaliq Urdu with extra line height. */

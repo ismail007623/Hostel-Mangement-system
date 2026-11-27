@@ -70,12 +70,12 @@ export default function Landing({ slug }: { slug: string }) {
         {!isTaqwa ? (
           <section className="mx-auto max-w-3xl px-4 py-16">
             <Card>
-              <h1 className="text-2xl font-extrabold text-pine-800">This hostel page is not live yet</h1>
-              <p className="mt-2 text-slate-600">
+              <h1 className="text-2xl font-semibold text-ink">This hostel page is not live yet</h1>
+              <p className="mt-2 text-muted">
                 The hostel “{slug}” has not published its page yet. Please call Taqwa Boys Hostel on {QARI_PHONE} for
                 help.
               </p>
-              <Link href="/" className="mt-4 inline-block rounded-full bg-pine-700 px-5 py-3 font-bold text-white">
+              <Link href="/" className="mt-4 inline-block inline-flex h-11 items-center rounded-btn bg-brand px-5 text-sm font-semibold text-white">
                 {t.backHome}
               </Link>
             </Card>
@@ -85,30 +85,30 @@ export default function Landing({ slug }: { slug: string }) {
             {/* Hero */}
             <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-10 sm:py-14 lg:grid-cols-2">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold-600">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-success">
                   {hostelLoaded ? hostelName : "Taqwa Boys Hostel"} · UMT · Johar Town
                 </p>
-                <h1 className="mt-3 text-4xl font-extrabold leading-tight text-pine-800 sm:text-5xl">
+                <h1 className="mt-3 text-4xl font-semibold leading-tight text-ink sm:text-5xl">
                   {t.heroTitle}
                 </h1>
-                <p className="mt-4 text-lg text-slate-600">{t.heroSub}</p>
+                <p className="mt-4 text-lg text-muted">{t.heroSub}</p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <a
                     href={waLink(QARI_PHONE, "Assalam-o-Alaikum, mujhe Taqwa Boys Hostel me seat chahiye.")}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full bg-pine-700 px-6 py-3 font-bold text-white shadow hover:bg-pine-800"
+                    className="inline-flex h-11 items-center rounded-btn bg-brand px-6 text-sm font-semibold text-white hover:bg-brand-800"
                   >
                     {t.heroApply}
                   </a>
                   <a
                     href={`tel:+92${QARI_PHONE.slice(1)}`}
-                    className="rounded-full border-2 border-pine-700 px-6 py-3 font-bold text-pine-700"
+                    className="inline-flex h-11 items-center rounded-btn border border-brand bg-white px-6 text-sm font-semibold text-brand"
                   >
                     {t.heroCall}
                   </a>
                 </div>
-                <p className="mt-4 text-sm font-semibold text-slate-500">
+                <p className="mt-4 text-sm font-semibold text-muted">
                   {t.open24} · {t.address}
                 </p>
               </div>
@@ -118,10 +118,10 @@ export default function Landing({ slug }: { slug: string }) {
                   alt="Illustration of hostel buildings"
                   width={640}
                   height={420}
-                  className="w-full rounded-2xl border border-pine-100 bg-white shadow-sm"
+                  className="w-full rounded-card border border-line bg-white"
                   priority
                 />
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-xs text-muted">
                   Illustration — real Taqwa photos will replace this.
                 </p>
               </div>
@@ -139,11 +139,11 @@ export default function Landing({ slug }: { slug: string }) {
               <div className="grid gap-4 sm:grid-cols-3">
                 {ROOM_TYPES.map((r) => (
                   <Card key={r.type}>
-                    <p className="text-xl font-extrabold text-pine-800">{r.type}</p>
-                    <p className="mt-1 text-sm text-slate-500">{r.desc}</p>
-                    <p className="mt-4 text-sm text-slate-500">{t.startingFrom}</p>
-                    <p className="text-2xl font-extrabold text-pine-700">
-                      Rs 8,000 <span className="text-sm font-semibold text-slate-500">{t.perMonth}</span>
+                    <p className="text-xl font-semibold text-ink">{r.type}</p>
+                    <p className="mt-1 text-sm text-muted">{r.desc}</p>
+                    <p className="mt-4 text-sm text-muted">{t.startingFrom}</p>
+                    <p className="text-2xl font-semibold text-brand">
+                      Rs 8,000 <span className="text-sm font-semibold text-muted">{t.perMonth}</span>
                     </p>
                   </Card>
                 ))}
@@ -155,7 +155,7 @@ export default function Landing({ slug }: { slug: string }) {
               <SectionTitle eyebrow={t.facilities} title={t.facilitiesTitle} />
               <div className="flex flex-wrap gap-2">
                 {FACILITIES.map((f) => (
-                  <span key={f} className="rounded-full border border-pine-100 bg-white px-4 py-2 text-sm font-semibold text-pine-800 shadow-sm">
+                  <span key={f} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
                     {f}
                   </span>
                 ))}
@@ -166,7 +166,7 @@ export default function Landing({ slug }: { slug: string }) {
             <section id="about" className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-2">
               <Card>
                 <SectionTitle eyebrow={t.about} title={t.aboutTitle} />
-                <p className="text-slate-600">{t.aboutText}</p>
+                <p className="text-muted">{t.aboutText}</p>
               </Card>
               <Card>
                 <SectionTitle eyebrow={t.founderTitle} title={t.founderName} />
@@ -176,9 +176,9 @@ export default function Landing({ slug }: { slug: string }) {
                     alt="Qari Abdul Majeed, founder and manager of Taqwa Boys Hostel"
                     width={160}
                     height={160}
-                    className="h-32 w-32 shrink-0 rounded-2xl object-cover"
+                    className="h-32 w-32 shrink-0 rounded-card object-cover"
                   />
-                  <p className="text-slate-600">{t.founderText}</p>
+                  <p className="text-muted">{t.founderText}</p>
                 </div>
               </Card>
             </section>
@@ -189,10 +189,10 @@ export default function Landing({ slug }: { slug: string }) {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[t.step1, t.step2, t.step3, t.step4].map((s, i) => (
                   <Card key={i}>
-                    <p className="flex h-10 w-10 items-center justify-center rounded-full bg-gold-500/15 text-lg font-extrabold text-gold-600">
+                    <p className="flex h-10 w-10 items-center justify-center rounded-lg bg-active text-lg font-semibold text-brand">
                       {i + 1}
                     </p>
-                    <p className="mt-3 font-semibold text-pine-800">{s}</p>
+                    <p className="mt-3 font-semibold text-ink">{s}</p>
                   </Card>
                 ))}
               </div>
@@ -202,15 +202,15 @@ export default function Landing({ slug }: { slug: string }) {
             <section className="mx-auto max-w-6xl px-4 py-8">
               <SectionTitle eyebrow={t.locationTitle} title={t.locationTitle} />
               <Card>
-                <p className="font-semibold text-pine-800">{t.address}</p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="font-semibold text-ink">{t.address}</p>
+                <p className="mt-1 text-sm text-muted">
                   {t.open24} · Qari: {QARI_PHONE} · Hostel: {HOSTEL_PHONE}
                 </p>
                 <a
                   href={MAPS_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-4 inline-block rounded-full bg-pine-700 px-5 py-3 font-bold text-white"
+                  className="mt-4 inline-block inline-flex h-11 items-center rounded-btn bg-brand px-5 text-sm font-semibold text-white"
                 >
                   {t.openMap}
                 </a>

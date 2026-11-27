@@ -30,9 +30,9 @@ export function ExtrasBreakdown({ base, extras }: { base: number; extras: ExtraC
   const list = extras ?? [];
   const active = list.filter((e) => e.is_active);
   return (
-    <div className="rounded-xl bg-cream px-3 py-2">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Monthly total</dt>
-      <dd className="text-base font-semibold text-pine-800">
+    <div className="rounded-lg bg-active px-3 py-2">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Monthly total</dt>
+      <dd className="text-base font-semibold text-ink">
         {formatRs(base)} base{active.length ? ` + ${active.map((e) => `${e.name} ${formatRs(e.monthly_amount)}`).join(" + ")}` : ""} ={" "}
         {formatRs(base + extrasTotal(list))}
       </dd>
@@ -108,25 +108,25 @@ export function ExtrasManager({
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-pine-100 p-3">
-      <h4 className="font-extrabold text-pine-800">Extra charges (AC / Cooler / Geyser)</h4>
+    <div className="mt-3 rounded-lg border border-line p-3">
+      <h4 className="font-semibold text-ink">Extra charges (AC / Cooler / Geyser)</h4>
       <p className="mt-1 text-xs text-slate-500">
         Monthly total = base rent + active extras. Changes apply from the next rent cycle only.
       </p>
       {error ? <p className="mt-2 text-sm font-semibold text-red-700">{error}</p> : null}
       <ul className="mt-2 grid gap-2">
         {extras.map((c) => (
-          <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-cream px-3 py-2">
-            <span className="font-bold text-pine-800">{c.name}</span>
-            <span className="text-sm text-slate-600">{formatRs(c.monthly_amount)}/mo</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.is_active ? "bg-green-100 text-green-800" : "bg-slate-200 text-slate-600"}`}>
+          <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-active px-3 py-2">
+            <span className="font-semibold text-ink">{c.name}</span>
+            <span className="text-sm text-muted">{formatRs(c.monthly_amount)}/mo</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${c.is_active ? "bg-active text-brand" : "bg-slate-100 text-muted"}`}>
               {c.is_active ? "On" : "Off"}
             </span>
             <span className="ml-auto flex gap-2">
-              <button type="button" onClick={() => toggle(c)} className="text-sm font-bold text-pine-700 hover:underline">
+              <button type="button" onClick={() => toggle(c)} className="text-sm font-semibold text-brand hover:underline">
                 {c.is_active ? "Turn off" : "Turn on"}
               </button>
-              <button type="button" onClick={() => remove(c)} className="text-sm font-bold text-red-700 hover:underline">
+              <button type="button" onClick={() => remove(c)} className="text-sm font-semibold text-danger hover:underline">
                 Remove
               </button>
             </span>

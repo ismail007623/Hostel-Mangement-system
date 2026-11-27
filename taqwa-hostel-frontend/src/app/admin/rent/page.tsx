@@ -4,11 +4,27 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MessageCircle, Wallet } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
-import { Card, ErrorBox, Loading, SectionTitle, StatusPill } from "@/components/ui";
+import {
+  DataTable,
+  EmptyState,
+  ErrorBox,
+  Loading,
+  MetricCard,
+  SearchInput,
+  SectionTitle,
+  StatusPill,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+  Toolbar,
+} from "@/components/ui";
 
 interface DueRow {
   resident_id: number;
@@ -56,6 +72,7 @@ const FILTERS = ["all", "due", "due_soon", "overdue"] as const;
 export default function AdminRentPage() {
   const { t } = useLang();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const [search, setSearch] = useState("");
   const [due, setDue] = useState<DueRow[]>([]);
   const [paid, setPaid] = useState<PaidRow[]>([]);
   const [error, setError] = useState("");
@@ -81,92 +98,162 @@ export default function AdminRentPage() {
     load();
   }, [load]);
 
+  const q = search.trim().toLowerCase();
+  const dueFiltered = useMemo(
+    () => (q ? due.filter((r) => r.full_name.toLowerCase().includes(q) || r.phone.includes(q)) : due),
+    [due, q]
+  );
+  const paidFiltered = useMemo(
+    () => (q ? paid.filter((r) => r.full_name.toLowerCase().includes(q) || r.phone.includes(q)) : paid),
+    [paid, q]
+  );
+  const overdueCount = due.filter((r) => r.cycle.status === "overdue").length;
+  const totalRemaining = due.reduce((sum, r) => sum + (r.cycle.remaining || 0), 0);
+
   return (
     <AdminShell>
-      <SectionTitle eyebrow={t.admin} title={t.rent} />
+      <SectionTitle
+        eyebrow={t.admin}
+        title={t.rent}
+        sub="Who still owes rent and who has paid. Due date is start date + 30 days."
+      />
       {error ? <ErrorBox message={error} /> : null}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${
-              filter === f ? "bg-pine-700 text-white" : "border border-slate-300 bg-white text-pine-800"
-            }`}
-          >
-            {f === "all" ? "All due" : t[f as keyof typeof t] ?? f}
-          </button>
-        ))}
-      </div>
+      <Toolbar className="mb-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Rent status filter">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              className={`inline-flex h-11 items-center rounded-btn px-4 text-sm font-semibold ${
+                filter === f
+                  ? "bg-brand text-white"
+                  : "border border-line bg-white text-ink hover:bg-page"
+              }`}
+            >
+              {f === "all" ? "All due" : t[f as keyof typeof t] ?? f}
+            </button>
+          ))}
+        </div>
+        <SearchInput
+          label="Search by name or phone"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </Toolbar>
       {loading ? (
         <Loading label={t.loading} />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <h3 className="font-extrabold text-pine-800">Due ({due.length})</h3>
-            {due.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Nobody is due in this filter.</p>
-            ) : (
-              <ul className="mt-3 grid gap-3">
-                {due.map((r) => (
-                  <li key={r.resident_id} className="rounded-xl bg-cream p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-pine-800">{r.full_name}</span>
-                      <span className="text-sm text-slate-500">{r.phone}</span>
-                      <span className="ml-auto">
-                        <StatusPill status={r.cycle.status} />
+        <>
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <MetricCard icon={Wallet} label="Due now" value={due.length} sub={`${overdueCount} overdue`} />
+            <MetricCard icon={Wallet} label="Total remaining" value={formatRs(totalRemaining)} sub="Across all due cycles" />
+            <MetricCard icon={Wallet} label="Paid cycles" value={paid.length} sub="Fully paid this period" />
+          </div>
+
+          <h2 className="mb-3 text-lg font-semibold text-ink">Due ({dueFiltered.length})</h2>
+          {dueFiltered.length === 0 ? (
+            <EmptyState icon={Wallet} title="Nobody is due in this filter." />
+          ) : (
+            <DataTable>
+              <TableHead>
+                <TableRow>
+                  <TableHeadCell>Resident</TableHeadCell>
+                  <TableHeadCell>Room</TableHeadCell>
+                  <TableHeadCell>Due date</TableHeadCell>
+                  <TableHeadCell>Remaining / total</TableHeadCell>
+                  <TableHeadCell>Status</TableHeadCell>
+                  <TableHeadCell>Reminder</TableHeadCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {dueFiltered.map((r) => (
+                  <TableRow key={r.resident_id}>
+                    <TableCell>
+                      <span className="block font-semibold">{r.full_name}</span>
+                      <span className="block text-xs text-muted">{r.phone}</span>
+                    </TableCell>
+                    <TableCell>
+                      {r.building_name ?? "—"}
+                      {r.room_number ? ` · Room ${r.room_number}` : ""}
+                    </TableCell>
+                    <TableCell>{formatDate(r.cycle.due_date)}</TableCell>
+                    <TableCell>
+                      <span className="block font-semibold">{formatRs(r.cycle.remaining)}</span>
+                      <span className="block text-xs text-muted">
+                        of {formatRs(r.cycle.total_amount)} · Base{" "}
+                        {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
+                        {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)}
+                        {r.extras && r.extras.filter((e) => e.is_active).length > 0
+                          ? ` (${r.extras
+                              .filter((e) => e.is_active)
+                              .map((e) => `${e.name} ${formatRs(e.monthly_amount)}`)
+                              .join(", ")})`
+                          : ""}
                       </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {r.building_name ?? ""} {r.room_number ? `· Room ${r.room_number}` : ""} · Due{" "}
-                      {formatDate(r.cycle.due_date)} · Remaining {formatRs(r.cycle.remaining)} of{" "}
-                      {formatRs(r.cycle.total_amount)}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Base {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
-                      {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)} = {formatRs(r.cycle.total_amount)}
-                      {r.extras && r.extras.filter((e) => e.is_active).length > 0
-                        ? ` (${r.extras.filter((e) => e.is_active).map((e) => `${e.name} ${formatRs(e.monthly_amount)}`).join(", ")})`
-                        : ""}
-                    </p>
-                    {r.whatsapp_url ? (
-                      <a
-                        href={r.whatsapp_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-block rounded-full bg-green-700 px-4 py-2 text-sm font-bold text-white"
-                      >
-                        {t.remindWhatsApp}
-                      </a>
-                    ) : null}
-                  </li>
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status={r.cycle.status} />
+                    </TableCell>
+                    <TableCell>
+                      {r.whatsapp_url ? (
+                        <a
+                          href={r.whatsapp_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-btn border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-page"
+                        >
+                          <MessageCircle className="h-4 w-4" aria-hidden />
+                          {t.remindWhatsApp}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </ul>
-            )}
-          </Card>
-          <Card>
-            <h3 className="font-extrabold text-pine-800">Paid ({paid.length})</h3>
-            {paid.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No fully-paid cycles yet.</p>
-            ) : (
-              <ul className="mt-3 grid gap-3">
-                {paid.slice(0, 30).map((r, i) => (
-                  <li key={`${r.resident_id}-${i}`} className="flex flex-wrap items-center gap-2 rounded-xl bg-green-50 p-3">
-                    <span className="font-bold text-pine-800">{r.full_name}</span>
-                    <span className="text-sm text-slate-500">{r.phone}</span>
-                    <span className="text-xs text-slate-500">
-                      Base {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
-                      {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)}
-                    </span>
-                    <span className="ml-auto text-sm font-bold text-green-800">{formatRs(r.cycle.paid_amount)}</span>
-                    <StatusPill status="paid" label={t.paid} />
-                  </li>
+              </TableBody>
+            </DataTable>
+          )}
+
+          <h2 className="mb-3 mt-8 text-lg font-semibold text-ink">Paid ({paidFiltered.length})</h2>
+          {paidFiltered.length === 0 ? (
+            <EmptyState icon={Wallet} title="No fully-paid cycles yet." />
+          ) : (
+            <DataTable>
+              <TableHead>
+                <TableRow>
+                  <TableHeadCell>Resident</TableHeadCell>
+                  <TableHeadCell>Due date</TableHeadCell>
+                  <TableHeadCell>Paid</TableHeadCell>
+                  <TableHeadCell>Status</TableHeadCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paidFiltered.slice(0, 30).map((r, i) => (
+                  <TableRow key={`${r.resident_id}-${i}`}>
+                    <TableCell>
+                      <span className="block font-semibold">{r.full_name}</span>
+                      <span className="block text-xs text-muted">{r.phone}</span>
+                    </TableCell>
+                    <TableCell>{formatDate(r.cycle.due_date)}</TableCell>
+                    <TableCell>
+                      <span className="block font-semibold">{formatRs(r.cycle.paid_amount)}</span>
+                      <span className="block text-xs text-muted">
+                        Base {formatRs(r.cycle.base_amount ?? r.monthly_rent)} + extras{" "}
+                        {formatRs(r.cycle.extras_amount ?? r.extras_total ?? 0)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status="paid" label={t.paid} />
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </ul>
-            )}
-          </Card>
-        </div>
+              </TableBody>
+            </DataTable>
+          )}
+        </>
       )}
     </AdminShell>
   );

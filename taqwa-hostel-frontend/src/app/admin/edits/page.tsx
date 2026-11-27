@@ -5,10 +5,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FileEdit } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
-import { Card, ErrorBox, Field, Loading, PrimaryButton, SectionTitle, StatusPill, inputCls } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBox,
+  Input,
+  Loading,
+  SectionTitle,
+  StatusPill,
+  useToast,
+} from "@/components/ui";
 
 interface EditRequest {
   id: number;
@@ -25,11 +37,13 @@ interface EditRequest {
 
 export default function AdminEditsPage() {
   const { t } = useLang();
+  const { success } = useToast();
   const [rows, setRows] = useState<EditRequest[]>([]);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [reason, setReason] = useState("");
+  const [confirmReject, setConfirmReject] = useState<EditRequest | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +60,7 @@ export default function AdminEditsPage() {
   }, [load]);
 
   async function act(id: number, action: "approve" | "reject") {
+    setBusy(true);
     try {
       await api(`/api/v1/admin/profile-edit-requests/${id}/${action}`, {
         method: "POST",
@@ -53,10 +68,13 @@ export default function AdminEditsPage() {
         body: action === "reject" ? { reason: reason.trim() || "Rejected" } : {},
       });
       setReason("");
-      setNotice(t.saved);
+      setConfirmReject(null);
+      success(t.saved);
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.tryAgain);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -71,47 +89,62 @@ export default function AdminEditsPage() {
 
   return (
     <AdminShell>
-      <SectionTitle eyebrow={t.admin} title={t.editRequests} />
+      <SectionTitle
+        eyebrow={t.admin}
+        title={t.editRequests}
+        sub="Name, phone or CNIC changes need your approval — the phone is the resident's login."
+      />
       {error ? <ErrorBox message={error} /> : null}
-      {notice ? <p className="mb-4 rounded-2xl bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
       {loading ? (
         <Loading label={t.loading} />
       ) : rows.length === 0 ? (
-        <Card>
-          <p className="text-slate-500">No pending edit requests.</p>
-        </Card>
+        <EmptyState icon={FileEdit} title="No pending edit requests." />
       ) : (
         <div className="grid gap-3">
           {rows.map((r) => (
             <Card key={r.id}>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="font-extrabold text-pine-800">Request #{r.id}</span>
+                <span className="font-semibold text-ink">Request #{r.id}</span>
                 <StatusPill status={r.status} />
               </div>
-              <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
+              <ul className="mt-2 list-disc ps-5 text-sm text-ink">
                 {changes(r).map((c) => (
                   <li key={c}>{c}</li>
                 ))}
               </ul>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <PrimaryButton type="button" onClick={() => act(r.id, "approve")}>
+                <Button onClick={() => act(r.id, "approve")} loading={busy}>
                   {t.approve}
-                </PrimaryButton>
-                <Field label={t.reason}>
-                  <input className={`${inputCls} w-56`} value={reason} onChange={(e) => setReason(e.target.value)} />
-                </Field>
-                <button
-                  type="button"
-                  onClick={() => act(r.id, "reject")}
-                  className="rounded-full border-2 border-red-600 px-5 py-3 font-bold text-red-700"
-                >
+                </Button>
+                <span className="w-full max-w-xs">
+                  <Input
+                    aria-label={t.reason}
+                    placeholder={t.reason}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </span>
+                <Button variant="destructive" onClick={() => setConfirmReject(r)}>
                   {t.reject}
-                </button>
+                </Button>
               </div>
             </Card>
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmReject !== null}
+        title="Reject this edit request?"
+        message={
+          confirmReject
+            ? `Reject request #${confirmReject.id}? Nothing changes for the resident.${reason.trim() ? ` Reason: ${reason.trim()}` : ""}`
+            : ""
+        }
+        confirmLabel={t.reject}
+        onConfirm={() => confirmReject && act(confirmReject.id, "reject")}
+        onCancel={() => setConfirmReject(null)}
+        loading={busy}
+      />
     </AdminShell>
   );
 }

@@ -14,20 +14,20 @@ export function Header() {
   const { lang, setLang, t, largeText, setLargeText } = useLang();
   const pathname = usePathname();
   const linkCls = (href: string) =>
-    `rounded-full px-3 py-2 text-sm font-semibold ${
-      pathname === href ? "bg-pine-700 text-white" : "text-pine-800 hover:bg-pine-100"
+    `rounded-lg px-3 py-2 text-sm font-semibold ${
+      pathname === href ? "bg-active text-brand" : "text-ink hover:bg-page"
     }`;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-pine-100 bg-cream/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-line bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-700 text-xl font-extrabold text-cream">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-semibold text-white">
             T
           </span>
           <span className="leading-tight">
-            <span className="block text-base font-extrabold text-pine-800">Taqwa Boys Hostel</span>
-            <span className="block text-xs font-medium text-slate-500">Johar Town, Lahore — near UMT</span>
+            <span className="block text-base font-semibold text-ink">Taqwa Boys Hostel</span>
+            <span className="block text-xs font-medium text-muted">Johar Town, Lahore — near UMT</span>
           </span>
         </Link>
         <nav className="ml-auto flex flex-wrap items-center gap-1">
@@ -55,8 +55,8 @@ export function Header() {
             onClick={() => setLargeText(!largeText)}
             aria-pressed={largeText}
             title={t.largeText}
-            className={`rounded-full border px-3 py-2 text-sm font-bold ${
-              largeText ? "border-gold-500 bg-gold-500/10 text-gold-600" : "border-slate-300 text-slate-600"
+            className={`rounded-btn border px-3 py-2 text-sm font-semibold ${
+              largeText ? "border-brand bg-active text-brand" : "border-line text-ink"
             }`}
           >
             A+
@@ -64,7 +64,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setLang(lang === "en" ? "ur" : "en")}
-            className="rounded-full bg-pine-700 px-3 py-2 text-sm font-bold text-white"
+            className="rounded-btn bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-800"
           >
             {lang === "en" ? "اردو" : "English"}
           </button>
@@ -77,15 +77,15 @@ export function Header() {
 export function Footer() {
   const { t } = useLang();
   return (
-    <footer className="border-t border-pine-100 bg-pine-800 text-cream">
+    <footer className="border-t border-line bg-brand text-white">
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-3">
         <div>
-          <p className="text-lg font-extrabold">Taqwa Boys Hostel</p>
-          <p className="mt-1 text-sm text-cream/80">{t.address}</p>
-          <p className="mt-1 text-sm text-cream/80">{t.open24}</p>
+          <p className="text-lg font-semibold">Taqwa Boys Hostel</p>
+          <p className="mt-1 text-sm text-white/80">{t.address}</p>
+          <p className="mt-1 text-sm text-white/80">{t.open24}</p>
         </div>
         <div>
-          <p className="font-bold">Qari Abdul Majeed</p>
+          <p className="font-semibold">Qari Abdul Majeed</p>
           <p className="mt-1 text-sm">
             <a className="underline" href={`tel:+92${QARI_PHONE.slice(1)}`}>
               {QARI_PHONE}
@@ -106,7 +106,7 @@ export function Footer() {
           <a className="text-sm underline" href={MAPS_URL} target="_blank" rel="noreferrer">
             {t.openMap}
           </a>
-          <p className="mt-2 text-xs text-cream/60">
+          <p className="mt-2 text-xs text-white/60">
             Rent cycle: 30 days from your start date. No OTP login — phone + password only.
           </p>
         </div>

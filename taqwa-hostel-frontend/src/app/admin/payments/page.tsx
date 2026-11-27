@@ -6,10 +6,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { Eye } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
-import { Card, ErrorBox, Field, Loading, PrimaryButton, SectionTitle, StatusPill, inputCls } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBox,
+  Field,
+  Input,
+  Loading,
+  Modal,
+  SectionTitle,
+  StatusPill,
+  Toolbar,
+  useToast,
+} from "@/components/ui";
 
 interface Payment {
   id: number;
@@ -31,13 +46,15 @@ const FILTERS = ["pending", "approved", "rejected", "all"] as const;
 
 export default function AdminPaymentsPage() {
   const { t } = useLang();
+  const { success } = useToast();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("pending");
   const [rows, setRows] = useState<Payment[]>([]);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<Payment | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmReject, setConfirmReject] = useState<Payment | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,123 +73,159 @@ export default function AdminPaymentsPage() {
   }, [load]);
 
   async function act(id: number, action: "approve" | "reject") {
+    setBusy(true);
     try {
       await api(`/api/v1/admin/payments/${id}/${action}`, {
         method: "POST",
         auth: true,
         body: action === "reject" ? { reason: reason.trim() || "Rejected" } : {},
       });
-      setOpenId(null);
+      setViewing(null);
+      setConfirmReject(null);
       setReason("");
-      setNotice(t.saved);
+      success(t.saved);
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.tryAgain);
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <AdminShell>
-      <SectionTitle eyebrow={t.admin} title={t.payments} />
+      <SectionTitle
+        eyebrow={t.admin}
+        title={t.payments}
+        sub="Check each rent screenshot, then approve or reject it. Approving updates the rent cycle."
+      />
       {error ? <ErrorBox message={error} /> : null}
-      {notice ? <p className="mb-4 rounded-2xl bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${
-              filter === f ? "bg-pine-700 text-white" : "border border-slate-300 bg-white text-pine-800"
-            }`}
-          >
-            {f === "all" ? "All" : t[f as keyof typeof t] ?? f}
-          </button>
-        ))}
-      </div>
+      <Toolbar className="mb-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Payment status filter">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              className={`inline-flex h-11 items-center rounded-btn px-4 text-sm font-semibold ${
+                filter === f
+                  ? "bg-brand text-white"
+                  : "border border-line bg-white text-ink hover:bg-page"
+              }`}
+            >
+              {f === "all" ? "All" : t[f as keyof typeof t] ?? f}
+            </button>
+          ))}
+        </div>
+      </Toolbar>
       {loading ? (
         <Loading label={t.loading} />
       ) : rows.length === 0 ? (
-        <Card>
-          <p className="text-slate-500">No payments in this filter.</p>
-        </Card>
+        <EmptyState icon={Eye} title="No payments in this filter." />
       ) : (
         <div className="grid gap-3">
           {rows.map((p) => (
             <Card key={p.id}>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-extrabold text-pine-800">{p.full_name}</span>
-                <span className="text-sm text-slate-500">{p.phone}</span>
-                <span className="font-bold text-pine-700">{formatRs(p.amount)}</span>
-                <span className="text-sm text-slate-500">{p.method}</span>
-                <span className="text-sm text-slate-500">{formatDate(p.payment_date)}</span>
-                <span className="ml-auto">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-semibold text-ink">{p.full_name}</span>
+                <span className="text-sm text-muted">{p.phone}</span>
+                <span className="font-semibold text-brand">{formatRs(p.amount)}</span>
+                <span className="text-sm text-muted">{p.method}</span>
+                <span className="text-sm text-muted">{formatDate(p.payment_date)}</span>
+                <span className="ms-auto">
                   <StatusPill status={p.status} />
                 </span>
               </div>
               {p.cycle ? (
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-muted">
                   Cycle due {formatDate(p.cycle.due_date)} · Remaining {formatRs(p.cycle.remaining)}
                 </p>
               ) : null}
+              {p.reject_reason ? (
+                <p className="mt-1 text-sm font-medium text-danger">Rejected: {p.reject_reason}</p>
+              ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpenId(openId === p.id ? null : p.id)}
-                  className="rounded-full border-2 border-pine-700 px-4 py-2 text-sm font-bold text-pine-700"
-                >
+                <Button variant="secondary" icon={Eye} onClick={() => setViewing(p)}>
                   {t.viewScreenshot}
-                </button>
+                </Button>
                 {p.status === "pending" ? (
                   <>
-                    <PrimaryButton type="button" onClick={() => act(p.id, "approve")}>
+                    <Button onClick={() => act(p.id, "approve")} loading={busy}>
                       {t.approve}
-                    </PrimaryButton>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(openId === p.id ? null : p.id)}
-                      className="rounded-full border-2 border-red-600 px-4 py-2 text-sm font-bold text-red-700"
-                    >
+                    </Button>
+                    <Button variant="destructive" onClick={() => setViewing(p)}>
                       {t.reject}
-                    </button>
+                    </Button>
                   </>
                 ) : null}
               </div>
-              {openId === p.id ? (
-                <div className="mt-4">
-                  {p.screenshot_url ? (
-                    <Image
-                      src={p.screenshot_url.startsWith("/") ? p.screenshot_url : `/${p.screenshot_url}`}
-                      alt={`Rent screenshot from ${p.full_name}`}
-                      width={600}
-                      height={800}
-                      className="w-full max-w-md rounded-xl border"
-                    />
-                  ) : (
-                    <p className="text-sm text-slate-500">No screenshot attached.</p>
-                  )}
-                  {p.status === "pending" ? (
-                    <div className="mt-3 max-w-md">
-                      <Field label={t.reason}>
-                        <input className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this rejected?" />
-                      </Field>
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          onClick={() => act(p.id, "reject")}
-                          className="rounded-full bg-red-700 px-5 py-2.5 font-bold text-white"
-                        >
-                          {t.reject}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
             </Card>
           ))}
         </div>
       )}
+
+      {viewing ? (
+        <Modal
+          title={`Screenshot — ${viewing.full_name} · ${formatRs(viewing.amount)}`}
+          onClose={() => {
+            setViewing(null);
+            setReason("");
+          }}
+          footer={
+            viewing.status === "pending" ? (
+              <>
+                <Button variant="secondary" onClick={() => setViewing(null)}>
+                  Close
+                </Button>
+                <Button variant="destructive" onClick={() => setConfirmReject(viewing)}>
+                  {t.reject}
+                </Button>
+                <Button onClick={() => act(viewing.id, "approve")} loading={busy}>
+                  {t.approve}
+                </Button>
+              </>
+            ) : (
+              <Button variant="secondary" onClick={() => setViewing(null)}>
+                Close
+              </Button>
+            )
+          }
+        >
+          {viewing.screenshot_url ? (
+            <Image
+              src={viewing.screenshot_url.startsWith("/") ? viewing.screenshot_url : `/${viewing.screenshot_url}`}
+              alt={`Rent screenshot from ${viewing.full_name}`}
+              width={600}
+              height={800}
+              className="w-full max-w-md rounded-card border border-line"
+            />
+          ) : (
+            <p className="text-sm text-muted">No screenshot attached.</p>
+          )}
+          {viewing.status === "pending" ? (
+            <div className="mt-4 max-w-md">
+              <Field label={t.reason}>
+                <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this rejected?" />
+              </Field>
+            </div>
+          ) : null}
+        </Modal>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmReject !== null}
+        title="Reject this payment?"
+        message={
+          confirmReject
+            ? `Reject ${formatRs(confirmReject.amount)} from ${confirmReject.full_name}? The rent cycle stays unchanged.${reason.trim() ? ` Reason: ${reason.trim()}` : ""}`
+            : ""
+        }
+        confirmLabel={t.reject}
+        onConfirm={() => confirmReject && act(confirmReject.id, "reject")}
+        onCancel={() => setConfirmReject(null)}
+        loading={busy}
+      />
     </AdminShell>
   );
 }

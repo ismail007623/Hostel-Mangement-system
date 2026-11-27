@@ -5,10 +5,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BedDouble, Wallet } from "lucide-react";
 import { api, ApiError, formatDate, formatRs } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { ResidentShell } from "@/components/ResidentShell";
-import { Card, ErrorBox, Loading, SectionTitle, StatusPill } from "@/components/ui";
+import { Card, ErrorBox, Loading, MetricCard, SectionTitle, StatusPill } from "@/components/ui";
 
 interface MyRoom {
   full_name: string;
@@ -57,77 +58,98 @@ export default function ResidentHomePage() {
       .finally(() => setLoading(false));
   }, [t]);
 
+  const activeExtras = (room?.extras ?? []).filter((e) => e.is_active);
+
   return (
     <ResidentShell>
-      <SectionTitle eyebrow={t.resident} title={t.myRoom} />
+      <SectionTitle eyebrow={t.resident} title={t.myRoom} sub="Your room, your rent, and your current cycle." />
       {error ? <ErrorBox message={error} /> : null}
       {loading ? (
         <Loading label={t.loading} />
       ) : (
         <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MetricCard
+              icon={Wallet}
+              label="Remaining this cycle"
+              value={cycle ? formatRs(cycle.remaining) : "—"}
+              sub={cycle ? `of ${formatRs(cycle.total_amount)} · due ${formatDate(cycle.due_date)}` : undefined}
+            />
+            <MetricCard
+              icon={BedDouble}
+              label="Monthly total"
+              value={formatRs(room?.monthly_total ?? room?.monthly_rent)}
+              sub={
+                activeExtras.length > 0
+                  ? `${formatRs(room?.monthly_rent)} base + ${activeExtras
+                      .map((e) => `${e.name} ${formatRs(e.monthly_amount)}`)
+                      .join(" + ")}`
+                  : "Base rent only"
+              }
+              tooltip="Extra charges apply from the next rent cycle."
+            />
+          </div>
           <Card>
-            <h3 className="text-xl font-extrabold text-pine-800">{room?.full_name ?? "—"}</h3>
+            <h2 className="text-lg font-semibold text-ink">{room?.full_name ?? "—"}</h2>
             <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Building</dt>
-                <dd className="font-semibold text-pine-800">{room?.building_name ?? "—"}</dd>
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Building</dt>
+                <dd className="font-semibold text-ink">{room?.building_name ?? "—"}</dd>
               </div>
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Room</dt>
-                <dd className="font-semibold text-pine-800">
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Room</dt>
+                <dd className="font-semibold text-ink">
                   {room?.room_number ? `Room ${room.room_number}` : "—"}
                   {room?.seat_label ? ` · Seat ${room.seat_label}` : ""}
                   {room?.portion_name ? ` · ${room.portion_name}` : ""}
                 </dd>
               </div>
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Monthly rent</dt>
-                <dd className="font-semibold text-pine-800">
-                  {formatRs(room?.monthly_rent)} base
-                  {(room?.extras ?? []).filter((e) => e.is_active).length > 0
-                    ? ` + ${(room?.extras ?? []).filter((e) => e.is_active).map((e) => `${e.name} ${formatRs(e.monthly_amount)}`).join(" + ")} = ${formatRs(room?.monthly_total ?? room?.monthly_rent)}`
-                    : ""}
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Start date</dt>
+                <dd className="font-semibold text-ink">{formatDate(room?.start_date)}</dd>
+              </div>
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Security paid</dt>
+                <dd className="font-semibold text-ink">{formatRs(room?.security_paid)}</dd>
+              </div>
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Next due date</dt>
+                <dd className="font-semibold text-ink">{formatDate(room?.next_due_date)}</dd>
+              </div>
+              <div className="rounded-card bg-page px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">Current cycle</dt>
+                <dd className="font-semibold text-ink">
+                  {cycle ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      Due {formatDate(cycle.due_date)}
+                      <StatusPill status={cycle.status} />
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </dd>
-                <dd className="mt-1 text-xs text-slate-500">Extra charges apply from the next rent cycle.</dd>
-              </div>
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Start date</dt>
-                <dd className="font-semibold text-pine-800">{formatDate(room?.start_date)}</dd>
-              </div>
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Security paid</dt>
-                <dd className="font-semibold text-pine-800">{formatRs(room?.security_paid)}</dd>
-              </div>
-              <div className="rounded-xl bg-cream px-3 py-2">
-                <dt className="text-xs font-bold uppercase text-slate-500">Next due date</dt>
-                <dd className="font-semibold text-pine-800">{formatDate(room?.next_due_date)}</dd>
               </div>
             </dl>
           </Card>
           <Card>
-            <h3 className="font-extrabold text-pine-800">Current rent</h3>
+            <h2 className="text-lg font-semibold text-ink">Current rent</h2>
             {cycle ? (
               <>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <span className="text-2xl font-extrabold text-pine-700">{formatRs(cycle.remaining)}</span>
-                  <span className="text-sm text-slate-500">remaining of {formatRs(cycle.total_amount)}</span>
-                  <StatusPill status={cycle.status} />
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-muted">
                   Due {formatDate(cycle.due_date)} · Final deadline {formatDate(cycle.final_deadline)} · Grace{" "}
-                  {cycle.grace_days} days
+                  {cycle.grace_days} days · Paid {formatRs(cycle.paid_amount)} of {formatRs(cycle.total_amount)}
                 </p>
                 {cycle.remaining > 0 ? (
                   <Link
                     href="/resident/pay"
-                    className="mt-4 inline-block rounded-full bg-pine-700 px-5 py-3 font-bold text-white"
+                    className="mt-4 inline-flex h-11 items-center justify-center rounded-btn bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-800"
                   >
                     {t.payRent}
                   </Link>
                 ) : null}
               </>
             ) : (
-              <p className="mt-2 text-sm text-slate-500">No rent cycle yet. Please ask Qari Sahib.</p>
+              <p className="mt-2 text-sm text-muted">No rent cycle yet. Please ask Qari Sahib.</p>
             )}
           </Card>
         </div>

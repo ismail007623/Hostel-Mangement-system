@@ -1,18 +1,37 @@
-/* Admin rooms: buildings -> room cards -> room view modal.
+/* Admin rooms: building selector -> compact room cards -> room view modal.
    Building create, room create, room edit and room view are all
    proper modal pop-outs (no inline forms on the page).
    Room create: room number + 2/3/4-seater required, building
    OPTIONAL — blank uses the only building, or auto-creates a
-   "Main Building" when there is none. No floor field anywhere. */
+   "Main Building" when there is none. No floor field anywhere.
+   Availability filter is client-side over the loaded page: the
+   backend room list endpoints take no availability parameter. */
 
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { BedSingle, Building2, DoorOpen, Eye, MoreVertical, Pencil, Plus } from "lucide-react";
 import { api, ApiError, formatRs, unwrapPage, type Page } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { AdminShell } from "@/components/AdminShell";
 import PersonCard, { type PersonCardData } from "@/components/PersonCard";
-import { Card, ErrorBox, Field, Loading, Modal, PrimaryButton, SectionTitle, inputCls } from "@/components/ui";
+import {
+  Button,
+  Card,
+  DropdownMenu,
+  DropdownMenuItem,
+  EmptyState,
+  ErrorBox,
+  IconButton,
+  Input,
+  Loading,
+  Modal,
+  Pagination,
+  Select,
+  StatusBadge,
+  Toolbar,
+  useToast,
+} from "@/components/ui";
 import type { ExtraCharge } from "@/components/ExtraCharges";
 
 interface Building {
@@ -49,18 +68,29 @@ interface RoomDetail extends RoomCard {
   residents: (RoomResident & { extras?: ExtraCharge[] })[];
 }
 
+type AvailabilityFilter = "all" | "vacant" | "full";
+
+function occupancy(room: RoomCard): { status: string; label: string } {
+  if (room.vacant_seats === room.total_seats) return { status: "vacant", label: "Vacant" };
+  if (room.vacant_seats === 0) return { status: "occupied", label: "Full" };
+  return { status: "active", label: "Partly occupied" };
+}
+
 export default function AdminRoomsPage() {
   const { t } = useLang();
+  const toast = useToast();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [activeBuilding, setActiveBuilding] = useState<Building | null>(null);
   const [rooms, setRooms] = useState<RoomCard[]>([]);
   const [roomsPage, setRoomsPage] = useState<Page<RoomCard> | null>(null);
   const [page, setPage] = useState(1);
+  const [availability, setAvailability] = useState<AvailabilityFilter>("all");
   const [person, setPerson] = useState<PersonCardData | null>(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"building" | "room" | "edit" | "view" | null>(null);
+  const [modalError, setModalError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [newBuilding, setNewBuilding] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [roomType, setRoomType] = useState("2-seater");
@@ -69,17 +99,6 @@ export default function AdminRoomsPage() {
   const [portions, setPortions] = useState<{ id: number; name: string }[]>([]);
   const [editing, setEditing] = useState<RoomCard | null>(null);
   const [viewing, setViewing] = useState<RoomDetail | null>(null);
-
-  const loadBuildings = useCallback(async () => {
-    try {
-      const data = await api<Page<Building>>("/api/v1/admin/buildings?page=1&page_size=100", { auth: true });
-      setBuildings(unwrapPage(data));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.tryAgain);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
 
   const loadRooms = useCallback(
     async (building: Building | null, p = 1) => {
@@ -103,6 +122,25 @@ export default function AdminRoomsPage() {
     [t]
   );
 
+  const loadBuildings = useCallback(async (): Promise<Building[]> => {
+    try {
+      const data = await api<Page<Building>>("/api/v1/admin/buildings?page=1&page_size=100", { auth: true });
+      const list = unwrapPage(data);
+      setBuildings(list);
+      // Auto-select when there is only one building.
+      if (list.length === 1) {
+        setActiveBuilding(list[0]);
+        loadRooms(list[0], 1);
+      }
+      return list;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.tryAgain);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [t, loadRooms]);
+
   useEffect(() => {
     loadBuildings();
   }, [loadBuildings]);
@@ -117,16 +155,24 @@ export default function AdminRoomsPage() {
       .catch(() => setPortions([]));
   }, [roomBuildingId]);
 
-  function openBuilding(b: Building) {
+  const filteredRooms = useMemo(() => {
+    if (availability === "vacant") return rooms.filter((r) => r.vacant_seats > 0);
+    if (availability === "full") return rooms.filter((r) => r.vacant_seats === 0);
+    return rooms;
+  }, [rooms, availability]);
+
+  function openBuilding(b: Building | null) {
     setActiveBuilding(b);
     setPerson(null);
     setViewing(null);
+    setAvailability("all");
     loadRooms(b, 1);
   }
 
   async function openView(room: RoomCard) {
     try {
       setViewing(await api<RoomDetail>(`/api/v1/admin/rooms/${room.id}`, { auth: true }));
+      setModalError("");
       setModal("view");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.tryAgain);
@@ -141,23 +187,33 @@ export default function AdminRoomsPage() {
     }
   }
 
+  function closeModal() {
+    setModal(null);
+    setModalError("");
+    setSaving(false);
+  }
+
   async function createBuilding(e: FormEvent) {
     e.preventDefault();
-    setError("");
+    setModalError("");
+    setSaving(true);
     try {
       await api("/api/v1/admin/buildings", { method: "POST", auth: true, body: { name: newBuilding.trim() } });
       setNewBuilding("");
-      setModal(null);
-      setNotice(t.saved);
+      closeModal();
+      toast.success(t.saved);
       loadBuildings();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.tryAgain);
+      setModalError(err instanceof ApiError ? err.message : t.tryAgain);
+    } finally {
+      setSaving(false);
     }
   }
 
   async function createRoom(e: FormEvent) {
     e.preventDefault();
-    setError("");
+    setModalError("");
+    setSaving(true);
     try {
       const body: Record<string, unknown> = { room_number: roomNumber.trim(), room_type: roomType };
       if (roomBuildingId) body.building_id = Number(roomBuildingId);
@@ -165,35 +221,40 @@ export default function AdminRoomsPage() {
       const created = await api<RoomCard>("/api/v1/admin/rooms", { method: "POST", auth: true, body });
       setRoomNumber("");
       setRoomPortion("");
-      setModal(null);
-      setNotice(t.saved);
-      await loadBuildings();
-      const b = buildings.find((x) => x.id === created.building_id) ?? null;
+      closeModal();
+      toast.success(t.saved);
+      const list = await loadBuildings();
+      const b = list.find((x) => x.id === created.building_id) ?? null;
       if (b) {
         setActiveBuilding(b);
         loadRooms(b, 1);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.tryAgain);
+      setModalError(err instanceof ApiError ? err.message : t.tryAgain);
+    } finally {
+      setSaving(false);
     }
   }
 
   async function editRoom(e: FormEvent) {
     e.preventDefault();
     if (!editing) return;
-    setError("");
+    setModalError("");
+    setSaving(true);
     try {
       await api(`/api/v1/admin/rooms/${editing.id}`, {
         method: "PUT",
         auth: true,
         body: { room_number: roomNumber.trim(), room_type: roomType },
       });
-      setModal(null);
+      closeModal();
       setEditing(null);
-      setNotice(t.saved);
+      toast.success(t.saved);
       if (activeBuilding) loadRooms(activeBuilding, page);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.tryAgain);
+      setModalError(err instanceof ApiError ? err.message : t.tryAgain);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -201,114 +262,236 @@ export default function AdminRoomsPage() {
     setEditing(room);
     setRoomNumber(room.room_number);
     setRoomType(room.room_type);
+    setModalError("");
     setModal("edit");
   }
 
   function startCreateRoom() {
     setRoomNumber("");
     setRoomType("2-seater");
-    setRoomBuildingId(activeBuilding ? String(activeBuilding.id) : "");
+    // Pre-select the active building — or the only building, when there is one.
+    setRoomBuildingId(
+      activeBuilding ? String(activeBuilding.id) : buildings.length === 1 ? String(buildings[0].id) : ""
+    );
     setRoomPortion("");
+    setModalError("");
     setModal("room");
   }
 
+  function onCardKeyDown(e: KeyboardEvent, room: RoomCard) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openView(room);
+    }
+  }
+
+  const totalVacant = rooms.reduce((s, r) => s + r.vacant_seats, 0);
+
   return (
     <AdminShell>
-      <SectionTitle eyebrow={t.admin} title={t.rooms} sub="Rooms are cards: seats, residents and rent at a glance. Use the buttons to add a building or a room." />
-      {error ? <ErrorBox message={error} /> : null}
-      {notice ? <p className="mb-4 rounded-2xl bg-green-50 p-3 text-sm font-bold text-green-800">{notice}</p> : null}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <PrimaryButton type="button" onClick={() => setModal("building")}>
-          + Add building
-        </PrimaryButton>
-        <PrimaryButton type="button" onClick={startCreateRoom}>
-          + Add room
-        </PrimaryButton>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[28px] font-semibold leading-tight text-ink sm:text-[30px]">{t.rooms}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Rooms are cards: seats, residents and rent at a glance. Pick a building, then add a room or a building.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon={Building2} onClick={() => { setNewBuilding(""); setModalError(""); setModal("building"); }}>
+            Add building
+          </Button>
+          <Button icon={Plus} onClick={startCreateRoom}>
+            Add room
+          </Button>
+        </div>
       </div>
+
+      {error ? <div className="mb-4"><ErrorBox message={error} /></div> : null}
+
       {loading ? (
         <Loading label={t.loading} />
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap gap-2">
-            {buildings.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => openBuilding(b)}
-                className={`rounded-full px-4 py-2 text-sm font-bold ${
-                  activeBuilding?.id === b.id ? "bg-pine-700 text-white" : "border border-slate-300 bg-white text-pine-800"
-                }`}
-              >
-                {b.name}
-              </button>
-            ))}
-            {buildings.length === 0 ? <p className="text-sm text-slate-500">No buildings yet — add one, or add a room and a “Main Building” is created for you.</p> : null}
-          </div>
+          <Toolbar className="mb-4">
+            <Select
+              aria-label="Building"
+              className="w-full sm:w-64"
+              value={activeBuilding ? String(activeBuilding.id) : ""}
+              onChange={(e) => {
+                const b = buildings.find((x) => x.id === Number(e.target.value)) ?? null;
+                openBuilding(b);
+              }}
+              options={[
+                { value: "", label: "All buildings — pick one" },
+                ...buildings.map((b) => ({ value: String(b.id), label: b.name })),
+              ]}
+            />
+            <Select
+              aria-label="Availability"
+              className="w-full sm:w-56"
+              value={availability}
+              onChange={(e) => setAvailability(e.target.value as AvailabilityFilter)}
+              options={[
+                { value: "all", label: "All rooms" },
+                { value: "vacant", label: "Has vacant seats" },
+                { value: "full", label: "Fully occupied" },
+              ]}
+            />
+            {activeBuilding ? (
+              <span className="ml-auto text-sm text-muted">
+                {roomsPage?.total ?? rooms.length} rooms · {totalVacant} vacant seats
+              </span>
+            ) : null}
+          </Toolbar>
 
-          {activeBuilding ? (
+          {buildings.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="No buildings yet"
+              description="Add a building, or add a room and a “Main Building” is created for you."
+              action={<Button icon={Plus} onClick={startCreateRoom}>Add room</Button>}
+            />
+          ) : !activeBuilding ? (
+            <Card>
+              <p className="text-sm text-muted">Pick a building above to see its rooms.</p>
+            </Card>
+          ) : rooms.length === 0 ? (
+            <EmptyState
+              icon={DoorOpen}
+              title="No rooms in this building yet"
+              description={`Add the first room to ${activeBuilding.name}.`}
+              action={<Button icon={Plus} onClick={startCreateRoom}>Add room</Button>}
+            />
+          ) : filteredRooms.length === 0 ? (
+            <EmptyState
+              icon={DoorOpen}
+              title="No rooms match this filter"
+              description="Try a different availability filter to see more rooms."
+              action={<Button variant="secondary" onClick={() => setAvailability("all")}>Show all rooms</Button>}
+            />
+          ) : (
             <>
-              <h3 className="mb-3 font-extrabold text-pine-800">
-                Rooms — {activeBuilding.name} ({roomsPage?.total ?? rooms.length})
-              </h3>
-              {rooms.length === 0 ? (
-                <Card><p className="text-slate-500">No rooms in this building yet.</p></Card>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {rooms.map((r) => (
-                    <Card key={r.id}>
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-lg font-extrabold text-pine-800">Room {r.room_number}</h4>
-                        <span className="rounded-full bg-cream px-3 py-1 text-xs font-bold text-pine-800">{r.room_type}</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5" aria-label={`${r.vacant_seats} vacant of ${r.total_seats} seats`}>
-                        {Array.from({ length: r.total_seats }).map((_, i) => (
-                          <span
-                            key={i}
-                            className={`h-3.5 w-3.5 rounded-full ${i < r.occupied_seats ? "bg-pine-700" : "bg-green-300"}`}
-                            title={i < r.occupied_seats ? "Occupied seat" : "Vacant seat"}
-                          />
-                        ))}
-                        <span className="ml-1 text-sm font-semibold text-slate-600">
-                          {r.vacant_seats} vacant · {r.occupied_seats} occupied
-                        </span>
-                      </div>
-                      <ul className="mt-3 grid gap-1">
-                        {r.residents.map((res) => (
-                          <li key={res.id} className="flex flex-wrap items-center gap-2 text-sm">
-                            <button type="button" onClick={() => openPerson(res.id)} className="font-bold text-pine-800 hover:underline">
-                              {res.full_name}
-                            </button>
-                            <span className="text-slate-500">{formatRs(res.monthly_total)}/mo</span>
-                          </li>
-                        ))}
-                        {r.residents.length === 0 ? <li className="text-sm text-slate-500">Empty room.</li> : null}
-                      </ul>
-                      <div className="mt-4 flex gap-2">
-                        <button type="button" onClick={() => openView(r)} className="rounded-full bg-pine-700 px-4 py-2 text-sm font-bold text-white">
-                          View
-                        </button>
-                        <button type="button" onClick={() => startEdit(r)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-pine-800">
-                          Edit
-                        </button>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredRooms.map((r) => {
+                  const occ = occupancy(r);
+                  return (
+                    <Card
+                      key={r.id}
+                      className="cursor-pointer transition-colors hover:border-brand/40"
+                    >
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View Room ${r.room_number}`}
+                        onClick={() => openView(r)}
+                        onKeyDown={(e) => onCardKeyDown(e, r)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="flex items-center gap-2">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-active text-brand">
+                              <DoorOpen className="h-5 w-5" aria-hidden />
+                            </span>
+                            <span>
+                              <span className="block text-lg font-semibold leading-tight text-ink">
+                                Room {r.room_number}
+                              </span>
+                              <span className="block text-xs text-muted">{r.room_type}</span>
+                            </span>
+                          </span>
+                          <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                            <DropdownMenu
+                              label={`Actions for Room ${r.room_number}`}
+                              trigger={<IconButton label={`Actions for Room ${r.room_number}`} icon={MoreVertical} />}
+                            >
+                              <DropdownMenuItem icon={Eye} onSelect={() => openView(r)}>
+                                View details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem icon={Pencil} onSelect={() => startEdit(r)}>
+                                Edit
+                              </DropdownMenuItem>
+                            </DropdownMenu>
+                          </span>
+                        </div>
+
+                        <div
+                          className="mt-3 flex flex-wrap items-center gap-1.5"
+                          aria-label={`${r.vacant_seats} vacant of ${r.total_seats} seats`}
+                        >
+                          {Array.from({ length: r.total_seats }).map((_, i) => (
+                            <span
+                              key={i}
+                              title={i < r.occupied_seats ? "Occupied seat" : "Vacant seat"}
+                              className={`flex h-6 w-6 items-center justify-center rounded-md ${
+                                i < r.occupied_seats ? "bg-brand text-white" : "bg-green-100 text-success"
+                              }`}
+                            >
+                              <BedSingle className="h-3.5 w-3.5" aria-hidden />
+                            </span>
+                          ))}
+                          <span className="ml-1 text-sm font-medium text-muted">
+                            {r.vacant_seats} vacant · {r.occupied_seats} occupied
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <StatusBadge status={occ.status} label={occ.label} />
+                          <span className="text-xs text-muted">
+                            {r.total_seats} seats
+                          </span>
+                        </div>
+
+                        <ul className="mt-3 grid gap-1 border-t border-line pt-3">
+                          {r.residents.map((res) => (
+                            <li key={res.id} className="flex flex-wrap items-center gap-2 text-sm">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openPerson(res.id);
+                                }}
+                                className="font-semibold text-brand hover:underline"
+                              >
+                                {res.full_name}
+                              </button>
+                              <span className="text-muted">{formatRs(res.monthly_total)}/mo</span>
+                            </li>
+                          ))}
+                          {r.residents.length === 0 ? (
+                            <li className="text-sm text-muted">Empty room.</li>
+                          ) : null}
+                        </ul>
                       </div>
                     </Card>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded bg-green-100 text-success">
+                    <BedSingle className="h-3 w-3" aria-hidden />
+                  </span>
+                  Available seat
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded bg-brand text-white">
+                    <BedSingle className="h-3 w-3" aria-hidden />
+                  </span>
+                  Occupied seat
+                </span>
+              </div>
+
               {roomsPage && roomsPage.pages > 1 ? (
-                <div className="mt-4 flex items-center gap-2">
-                  <button type="button" disabled={page <= 1} onClick={() => activeBuilding && loadRooms(activeBuilding, page - 1)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold disabled:opacity-50">
-                    Previous
-                  </button>
-                  <span className="text-sm text-slate-600">Page {page} of {roomsPage.pages}</span>
-                  <button type="button" disabled={page >= roomsPage.pages} onClick={() => activeBuilding && loadRooms(activeBuilding, page + 1)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold disabled:opacity-50">
-                    Next
-                  </button>
+                <div className="mt-4">
+                  <Pagination
+                    page={page}
+                    pages={roomsPage.pages}
+                    total={roomsPage.total}
+                    onPage={(p) => activeBuilding && loadRooms(activeBuilding, p)}
+                  />
                 </div>
               ) : null}
             </>
-          ) : (
-            <Card><p className="text-slate-500">Pick a building to see its rooms.</p></Card>
           )}
           {person ? (
             <div className="mt-4">
@@ -319,101 +502,164 @@ export default function AdminRoomsPage() {
       )}
 
       {modal === "building" ? (
-        <Modal title="Add building" onClose={() => setModal(null)}>
+        <Modal title="Add building" onClose={closeModal}>
           <form onSubmit={createBuilding} className="grid gap-4">
-            <Field label="Building name">
-              <input className={inputCls} required value={newBuilding} onChange={(e) => setNewBuilding(e.target.value)} placeholder="Building 1" />
-            </Field>
-            <PrimaryButton type="submit">Add building</PrimaryButton>
+            {modalError ? <ErrorBox message={modalError} /> : null}
+            <Input
+              label="Building name"
+              required
+              value={newBuilding}
+              onChange={(e) => setNewBuilding(e.target.value)}
+              placeholder="Building 1"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving}>
+                Add building
+              </Button>
+            </div>
           </form>
         </Modal>
       ) : null}
 
       {modal === "room" ? (
-        <Modal title="Add room" onClose={() => setModal(null)}>
+        <Modal title="Add room" onClose={closeModal}>
           <form onSubmit={createRoom} className="grid gap-4">
-            <Field label="Room number" hint="Required">
-              <input className={inputCls} required value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="111" />
-            </Field>
-            <Field label="Room type" hint="Required — seats are created automatically">
-              <select className={inputCls} value={roomType} onChange={(e) => setRoomType(e.target.value)}>
-                <option value="2-seater">2-seater</option>
-                <option value="3-seater">3-seater</option>
-                <option value="4-seater">4-seater</option>
-              </select>
-            </Field>
-            <Field label="Building (optional)" hint="Blank: uses the only building, or creates a “Main Building” when there is none.">
-              <select className={inputCls} value={roomBuildingId} onChange={(e) => setRoomBuildingId(e.target.value)}>
-                <option value="">— No building picked —</option>
-                {buildings.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Portion (optional)">
-              <select className={inputCls} value={roomPortion} onChange={(e) => setRoomPortion(e.target.value)}>
-                <option value="">— No portion —</option>
-                {portions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <PrimaryButton type="submit">Add room</PrimaryButton>
+            {modalError ? <ErrorBox message={modalError} /> : null}
+            <Input
+              label="Room number"
+              required
+              value={roomNumber}
+              onChange={(e) => setRoomNumber(e.target.value)}
+              placeholder="111"
+              helperText="Required"
+            />
+            <Select
+              label="Room type"
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
+              helperText="Required — seats are created automatically"
+              options={[
+                { value: "2-seater", label: "2-seater" },
+                { value: "3-seater", label: "3-seater" },
+                { value: "4-seater", label: "4-seater" },
+              ]}
+            />
+            <Select
+              label="Building (optional)"
+              value={roomBuildingId}
+              onChange={(e) => setRoomBuildingId(e.target.value)}
+              helperText="Blank: uses the only building, or creates a “Main Building” when there is none."
+              options={[
+                { value: "", label: "— No building picked —" },
+                ...buildings.map((b) => ({ value: String(b.id), label: b.name })),
+              ]}
+            />
+            <Select
+              label="Portion (optional)"
+              value={roomPortion}
+              onChange={(e) => setRoomPortion(e.target.value)}
+              options={[
+                { value: "", label: "— No portion —" },
+                ...portions.map((p) => ({ value: String(p.id), label: p.name })),
+              ]}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving}>
+                Add room
+              </Button>
+            </div>
           </form>
         </Modal>
       ) : null}
 
       {modal === "edit" && editing ? (
-        <Modal title={`Edit Room ${editing.room_number}`} onClose={() => setModal(null)}>
+        <Modal title={`Edit Room ${editing.room_number}`} onClose={closeModal}>
           <form onSubmit={editRoom} className="grid gap-4">
-            <Field label="Room number">
-              <input className={inputCls} required value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} />
-            </Field>
-            <Field label="Room type">
-              <select className={inputCls} value={roomType} onChange={(e) => setRoomType(e.target.value)}>
-                <option value="2-seater">2-seater</option>
-                <option value="3-seater">3-seater</option>
-                <option value="4-seater">4-seater</option>
-              </select>
-            </Field>
-            <p className="text-xs text-slate-500">Shrinking a room only removes vacant seats — a room with a resident in a seat that would go cannot be shrunk.</p>
-            <PrimaryButton type="submit">Save changes</PrimaryButton>
+            {modalError ? <ErrorBox message={modalError} /> : null}
+            <Input
+              label="Room number"
+              required
+              value={roomNumber}
+              onChange={(e) => setRoomNumber(e.target.value)}
+            />
+            <Select
+              label="Room type"
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
+              options={[
+                { value: "2-seater", label: "2-seater" },
+                { value: "3-seater", label: "3-seater" },
+                { value: "4-seater", label: "4-seater" },
+              ]}
+            />
+            <p className="text-xs text-muted">
+              Shrinking a room only removes vacant seats — a room with a resident in a seat that would go cannot be
+              shrunk.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving}>
+                Save changes
+              </Button>
+            </div>
           </form>
         </Modal>
       ) : null}
 
       {modal === "view" && viewing ? (
-        <Modal title={`Room ${viewing.room_number} — ${viewing.room_type}`} onClose={() => setModal(null)}>
-          <div className="grid gap-3">
-            <div className="flex flex-wrap gap-2">
-              {viewing.seats.map((s) => (
-                <span key={s.id} className={`rounded-full px-3 py-1.5 text-sm font-bold ${s.status === "vacant" ? "bg-green-100 text-green-800" : "bg-slate-200 text-slate-600"}`}>
-                  {s.seat_label} · {s.status}
-                </span>
-              ))}
+        <Modal title={`Room ${viewing.room_number} — ${viewing.room_type}`} onClose={closeModal} size="lg">
+          <div className="grid gap-4">
+            <div>
+              <p className="mb-2 text-sm font-semibold text-ink">Seats</p>
+              <div className="flex flex-wrap gap-2">
+                {viewing.seats.map((s) => (
+                  <span
+                    key={s.id}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                      s.status === "vacant" ? "bg-active text-brand" : "bg-slate-100 text-muted"
+                    }`}
+                  >
+                    {s.seat_label} · {s.status}
+                  </span>
+                ))}
+              </div>
             </div>
-            <ul className="grid gap-2">
-              {viewing.residents.map((res) => (
-                <li key={res.id} className="rounded-xl bg-cream p-3">
-                  <button type="button" onClick={() => openPerson(res.id)} className="font-bold text-pine-800 hover:underline">
-                    {res.full_name} · {res.phone}
-                  </button>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Base {formatRs(res.monthly_rent)} · Extras {formatRs(res.extras_total)} · Total {formatRs(res.monthly_total)}/mo
-                  </p>
-                  {res.extras && res.extras.length > 0 ? (
-                    <p className="text-xs text-slate-500">
-                      {res.extras.map((e) => `${e.name} ${formatRs(e.monthly_amount)}${e.is_active ? "" : " (off)"}`).join(", ")}
+            <div>
+              <p className="mb-2 text-sm font-semibold text-ink">Residents</p>
+              <ul className="grid gap-2">
+                {viewing.residents.map((res) => (
+                  <li key={res.id} className="rounded-card border border-line bg-page p-3">
+                    <button
+                      type="button"
+                      onClick={() => openPerson(res.id)}
+                      className="font-semibold text-brand hover:underline"
+                    >
+                      {res.full_name} · {res.phone}
+                    </button>
+                    <p className="mt-1 text-sm text-muted">
+                      Base {formatRs(res.monthly_rent)} · Extras {formatRs(res.extras_total)} · Total{" "}
+                      {formatRs(res.monthly_total)}/mo
                     </p>
-                  ) : null}
-                </li>
-              ))}
-              {viewing.residents.length === 0 ? <li className="text-sm text-slate-500">No residents in this room yet.</li> : null}
-            </ul>
+                    {res.extras && res.extras.length > 0 ? (
+                      <p className="text-xs text-muted">
+                        {res.extras.map((e) => `${e.name} ${formatRs(e.monthly_amount)}${e.is_active ? "" : " (off)"}`).join(", ")}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+                {viewing.residents.length === 0 ? (
+                  <li className="text-sm text-muted">No residents in this room yet.</li>
+                ) : null}
+              </ul>
+            </div>
           </div>
         </Modal>
       ) : null}
